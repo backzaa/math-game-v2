@@ -2,17 +2,6 @@ export type UserRole = 'STUDENT' | 'TEACHER';
 export type ScoringMode = 'CLASSROOM' | 'FREEPLAY';
 export type CharacterType = 'BOY' | 'GIRL' | 'ASTRONAUT' | 'ALIEN' | 'SUPERHERO' | 'NINJA' | 'PRINCESS';
 
-// [แก้ไข] เพิ่ม ThemeId ตามที่ constants.ts เรียกหา
-export type ThemeId = string;
-
-export type TileType = 'START' | 'FINISH' | 'NORMAL' | 'QUESTION' | 'TREASURE' | 'TRAP';
-
-export interface TileConfig {
-  x: number;
-  y: number;
-  type: TileType;
-}
-
 export interface CharacterAppearance {
   base: CharacterType;
   skinColor: string;
@@ -21,6 +10,7 @@ export interface CharacterAppearance {
   accessories?: string[];
 }
 
+// [จุดที่หายไป] ต้องมี PlayerState ตรงนี้ครับ
 export interface PlayerState {
   id: string;
   firstName?: string;
@@ -41,23 +31,20 @@ export interface MathQuestion {
   id: string;
   question: string;
   answer: number;
-  type?: 'ADD' | 'SUBTRACT' | 'MULTIPLY' | 'DIVIDE';
-  difficulty?: number;
-  options?: number[];
+  type: 'ADD' | 'SUBTRACT' | 'MULTIPLY' | 'DIVIDE';
+  difficulty: number;
 }
 
 export interface QuestionDetail {
-  questionId?: string;
+  questionId: string;
   questionText: string;
-  userAnswer?: string;
-  correctAnswer?: string;
+  userAnswer: string;
+  correctAnswer: string;
   isCorrect: boolean;
-  timeSpent?: number;
-  timestamp?: string;
+  timeSpent: number;
+  timestamp: string;
   scoreEarned?: number;
 }
-
-export interface QuestionLog extends QuestionDetail {}
 
 export interface GameSession {
   sessionId: string;
@@ -72,16 +59,40 @@ export interface ThemeConfig {
   id: string;
   name: string;
   bgClass: string;
-  primaryColor?: string;
-  secondaryColor?: string;
-  // [แก้ไข] เพิ่ม pathColor เข้าไป เพื่อแก้ Error ใน constants.ts
-  pathColor?: string; 
-  decorations?: string[];
-  bgmUrls?: string[];
-  bgmPlaylist?: string[];
-  themeBackgrounds?: Record<string, string>;
+  primaryColor: string;
+  secondaryColor: string;
+  decorations: string[];
+  bgmUrls: string[];
 }
 
 export interface StudentProfile extends PlayerState {
   totalScore?: number;
+}
+
+export interface GameConfig {
+  schoolName: string;
+  educationYear: string;
+  bgmPlaylist: string[];
+  themeBackgrounds: Record<string, string>; 
+}
+
+export interface QuestionSet {
+  classroom: MathQuestion[];
+  freeplay: MathQuestion[];
+}
+
+// [ประเภทข้อมูลใหม่สำหรับแผนที่]
+export type TileType = 'START' | 'FINISH' | 'NORMAL' | 'QUESTION' | 'TREASURE' | 'TRAP';
+
+export interface TileConfig {
+    x: number;
+    y: number;
+    type: TileType;
+}
+
+export interface QuestionLog {
+    id: string;
+    text: string;
+    isCorrect: boolean;
+    timestamp: number;
 }
