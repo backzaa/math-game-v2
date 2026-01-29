@@ -1,14 +1,14 @@
-// (ส่วน Import คงเดิม...)
-import React, { useState, useEffect, useRef } from 'react';
+// [แก้ไข] ลบ React ออก เหลือแค่ { ... }
+import { useState, useEffect, useRef } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { GameBoard } from './components/GameBoard';
 import { StorageService } from './services/storage'; 
-import { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail } from './types'; 
+import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail } from './types'; 
 import { 
-  Star, Gamepad2, Sparkles, CloudSync, 
-  Calculator, Plus, Minus, Divide, X,
-  Smile, Backpack, BookOpen, Infinity, Pi, Sigma, Lock
+  Star, Gamepad2, CloudSync, 
+  Plus, Divide,
+  Smile, Backpack, BookOpen, Infinity, Pi, Lock
 } from 'lucide-react';
 
 const THEMES: ThemeConfig[] = [
@@ -23,7 +23,6 @@ const THEMES: ThemeConfig[] = [
 
 export function App() {
   const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'MODE_SELECT' | 'THEME_SELECT' | 'GAME' | 'DASHBOARD'>('LOADING');
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState<string>('');
   const [gameMode, setGameMode] = useState<ScoringMode>('CLASSROOM');
@@ -35,7 +34,6 @@ export function App() {
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
   const timerRef = useRef<any>(null);
 
-  // บังคับใช้ฟอนต์ Mali ทั่วทั้งแอป
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Mali:wght@400;700&display=swap';
@@ -72,7 +70,6 @@ export function App() {
   };
 
   const handleLogin = (role: UserRole, id: string, guestNickname?: string) => {
-    setUserRole(role);
     if (role === 'TEACHER') setScreen('DASHBOARD');
     else {
       setCurrentStudentId(id);
@@ -84,8 +81,7 @@ export function App() {
   // --- UI: LOADING SCREEN ---
   if (screen === 'LOADING') {
     return (
-      // เปลี่ยน min-h-screen เป็น h-full เพื่อให้พอดีกับ index.html ที่ล็อคไว้
-      <div className="h-full w-full bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="min-h-screen w-full bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center p-6 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none opacity-30">
             <Plus className="absolute top-10 left-10 text-white w-16 h-16 animate-bounce-slow" />
             <Divide className="absolute bottom-20 left-10 text-white w-14 h-14 animate-spin-slow" />
@@ -112,7 +108,6 @@ export function App() {
   }
 
   return (
-    // [แก้ไขจุดสำคัญ] เปลี่ยน min-h-screen เป็น h-full และ w-full
     <div className="h-full w-full bg-slate-900 overflow-hidden flex flex-col">
       {screen === 'LOGIN' && <LoginScreen onLogin={handleLogin} />}
       {screen === 'DASHBOARD' && <TeacherDashboard onLogout={() => setScreen('LOGIN')} />}
@@ -153,7 +148,19 @@ export function App() {
                   <button key={theme.id} onClick={() => { 
                     setSelectedTheme(theme); setScreen('GAME'); 
                     const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
-                    setGamePlayers([{...(s || {id:'00', firstName:guestName, nickname:guestName, gender:'MALE', classroom:'ทั่วไป', appearance:{base:'BOY', skinColor:'#fcd34d'}, sessions:[]}), position:0, score:0, character:'BOY', calculatorUsesLeft:2, isFinished:false}]); 
+                    setGamePlayers([{
+                        ...(s || {
+                            id:'00', 
+                            firstName:guestName, 
+                            lastName: '', 
+                            nickname:guestName, 
+                            gender:'MALE', 
+                            classroom:'ทั่วไป', 
+                            appearance:{base:'BOY', skinColor:'#fcd34d'}, 
+                            sessions:[]
+                        }), 
+                        position:0, score:0, character:'BOY', calculatorUsesLeft:2, isFinished:false
+                    }]); 
                     setSessionDetails([]);
                   }} className="p-10 rounded-[35px] font-bold text-xl md:text-2xl text-white shadow-2xl hover:scale-105 transition-all relative overflow-hidden group border-4 border-white/5 h-36 md:h-auto">
                     <div className={`absolute inset-0 bg-gradient-to-br ${theme.id === 'space' ? 'from-blue-900 to-black' : theme.id === 'jungle' ? 'from-green-800 to-emerald-900' : 'from-gray-700 to-gray-900'}`}></div>
