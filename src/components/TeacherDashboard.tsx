@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage'; 
-import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types'; // แก้บรรทัดนี้ครับ
-import { LogOut, Trash2, UserPlus, Users, Palette, ChevronRight, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types'; 
+import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, CheckCircle2, XCircle, Clock, BarChart } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
@@ -35,21 +35,31 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
   const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
 
-  const refreshData = async () => { 
-      try {
-          await StorageService.syncFromCloud(); 
-          setStudents(StorageService.getAllStudents()); 
-          const cfg = StorageService.getGameConfig();
-          if(cfg) {
-              setGameConfig({ themeBackgrounds: cfg.themeBackgrounds || {}, bgmPlaylist: cfg.bgmPlaylist || [] });
-              setBgmInput((cfg.bgmPlaylist || []).join('\n'));
-          }
-          const currentQs = questionSettingMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayPool(); 
-          setGeneratedQuestions(Array.isArray(currentQs) ? currentQs : []);
-      } catch (e) { console.error("Sync Error:", e); }
+  // [แก้ไขจุดสำคัญ] เปลี่ยนฟังก์ชันโหลดข้อมูลให้อ่านจาก "ในเครื่อง" เท่านั้น (เร็วทันที)
+  const loadDataFromLocal = () => {
+      // 1. ดึงนักเรียน
+      setStudents(StorageService.getAllStudents()); 
+      
+      // 2. ดึงการตั้งค่า
+      const cfg = StorageService.getGameConfig();
+      if(cfg) {
+          setGameConfig({ themeBackgrounds: cfg.themeBackgrounds || {}, bgmPlaylist: cfg.bgmPlaylist || [] });
+          setBgmInput((cfg.bgmPlaylist || []).join('\n'));
+      }
+
+      // 3. ดึงโจทย์ (แยกโหมดชัดเจน)
+      let currentQs: MathQuestion[] = [];
+      if (questionSettingMode === 'CLASSROOM') {
+          currentQs = StorageService.getDailyQuestions();
+      } else {
+          // ใช้ฟังก์ชันที่แก้ให้แล้วใน storage.ts
+          currentQs = StorageService.getFreeplayQuestions(); 
+      }
+      setGeneratedQuestions(Array.isArray(currentQs) ? currentQs : []);
   };
 
-  useEffect(() => { refreshData(); }, [activeTab, questionSettingMode]);
+  // เรียกใช้เมื่อเปลี่ยนแท็บ หรือเปลี่ยนโหมดโจทย์ (จะทำงานทันที ไม่ต้องรอดาวน์โหลด)
+  useEffect(() => { loadDataFromLocal(); }, [activeTab, questionSettingMode]);
 
   const handleGenerateRandom = () => { 
       const generated: MathQuestion[] = [];
@@ -100,7 +110,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
             if (generatedQuestions.length !== 10) { alert('โหมดห้องเรียนหรรษาต้องมีครบ 10 ข้อครับ'); return; }
             await StorageService.saveDailyQuestions(generatedQuestions);
         } else { await StorageService.saveFreeplayQuestions(generatedQuestions); }
-        alert('บันทึกโจทย์สำเร็จแล้วครับ!'); refreshData();
+        alert('บันทึกโจทย์สำเร็จแล้วครับ!'); loadDataFromLocal();
     } catch (error) { alert('เกิดข้อผิดพลาดในการบันทึก'); }
   };
 
@@ -110,7 +120,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
     if (isEditingStudent && editingStudentId) StorageService.updateStudent(editingStudentId, { ...studentForm }); 
     else StorageService.registerStudent(studentForm.id, studentForm.firstName, studentForm.lastName, studentForm.nickname, studentForm.gender, studentForm.classroom, studentForm.profileImage || '');
     setStudentForm({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE', classroom: '', profileImage: '', base: 'BOY', skinColor: '#fcd34d' });
-    setIsEditingStudent(false); refreshData();
+    setIsEditingStudent(false); loadDataFromLocal();
   };
 
   const handleEditStudentClick = (s: StudentProfile) => {
@@ -269,7 +279,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                           )}
                           <div><div className="font-bold text-lg">{s.firstName} {s.lastName} ({s.nickname})</div><div className="text-xs text-slate-400 uppercase tracking-widest bg-slate-900/50 px-2 py-0.5 rounded-full w-fit mt-1 border border-slate-600">ห้อง {s.classroom}</div></div>
                         </div>
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button><button onClick={() => { if(confirm(`ยืนยันลบ ${s.firstName}?`)) { StorageService.deleteStudent(s.id); refreshData(); } }} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button></div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button><button onClick={() => { if(confirm(`ยืนยันลบ ${s.firstName}?`)) { StorageService.deleteStudent(s.id); loadDataFromLocal(); } }} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button></div>
                       </div>
                     ))}
                   </div>
@@ -325,7 +335,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                            <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">ผลรวมครั้งนี้</div>
                                         </div>
                                      </div>
-                                     <button onClick={() => { if(confirm('ลบประวัตินี้?')) { StorageService.deleteSession(selectedStudent.id, sess.sessionId); refreshData(); } }} className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"><Trash2 size={20}/></button>
+                                     <button onClick={() => { if(confirm('ลบประวัตินี้?')) { StorageService.deleteSession(selectedStudent.id, sess.sessionId); loadDataFromLocal(); } }} className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"><Trash2 size={20}/></button>
                                   </div>
                                </div>
                                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30">
@@ -344,7 +354,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                         ) : ( <div className="text-center py-20 text-slate-600 italic">ยังไม่มีประวัติการเล่นในโหมดนี้</div> )}
                       </div>
                     </div>
-                  ) : ( <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4"><Users size={60} className="opacity-10"/> เลือกนักเรียนทางซ้ายเพื่อดูผลการเรียน</div> )}
+                  ) : ( <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4"><BarChart size={60} className="opacity-10"/> เลือกนักเรียนทางซ้ายเพื่อดูผลการเรียน</div> )}
                </div>
            </div>
        )}

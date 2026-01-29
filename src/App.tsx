@@ -8,7 +8,7 @@ import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail } 
 import { 
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
-  Smile, Backpack, BookOpen, Infinity, Pi, Lock
+  Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2
 } from 'lucide-react';
 
 const THEMES: ThemeConfig[] = [
@@ -32,7 +32,7 @@ export function App() {
 
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
-  const timerRef = useRef<any>(null);
+  const isDataLoaded = useRef(false);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -42,23 +42,47 @@ export function App() {
     document.body.style.fontFamily = "'Mali', cursive";
   }, []);
 
+  // --- [แก้ไขใหม่] ระบบโหลดจริง (Real Loading) ---
   useEffect(() => {
+    if (screen !== 'LOADING' || isDataLoaded.current) return;
+
     const startLoading = async () => {
-      let progress = 0;
-      timerRef.current = setInterval(() => {
-        progress += Math.random() * 2.5;
-        if (progress > 35) { clearInterval(timerRef.current); return; }
-        setLoadProgress(Math.floor(progress));
-      }, 80);
+      // 1. วิ่งหลอกๆ ไปถึง 80% เพื่อให้รู้ว่าทำงานอยู่
+      const timer = setInterval(() => {
+        setLoadProgress(prev => {
+           if (prev >= 80) return 80; // หยุดรอที่ 80% จนกว่าข้อมูลจะมา
+           return prev + 1;
+        });
+      }, 50);
+
       try {
-        setLoadStatus('กำลังเชื่อมต่อฐานข้อมูลออนไลน์...');
+        setLoadStatus('กำลังดึงข้อมูลนักเรียนและโจทย์จาก Server...');
+        
+        // 2. [สำคัญ] รอโหลดข้อมูลจริงจนเสร็จ (ใช้เวลา 3-5 วินาที หรือมากกว่า)
         await StorageService.syncFromCloud(); 
+        
+        // 3. พอข้อมูลมาครบแล้ว ให้วิ่งไป 100%
+        clearInterval(timer);
+        setLoadStatus('ข้อมูลพร้อมแล้ว! กำลังเข้าสู่ระบบ...');
         setLoadProgress(100);
-        setScreen('LOGIN');
-      } catch (error) { setLoadProgress(100); setScreen('LOGIN'); }
+        isDataLoaded.current = true;
+
+        // หน่วงเวลาแป๊บเดียวให้เห็น 100% แล้วค่อยเปลี่ยนหน้า
+        setTimeout(() => {
+            setScreen('LOGIN');
+        }, 800);
+
+      } catch (error) { 
+          // ถ้าเน็ตหลุด ให้ยอมให้เข้าได้แต่ข้อมูลอาจจะเก่า
+          console.error("Load failed", error);
+          clearInterval(timer);
+          setLoadProgress(100);
+          setLoadStatus('โหลดไม่สมบูรณ์ (Offline Mode)');
+          setTimeout(() => setScreen('LOGIN'), 1000);
+      }
     };
-    if (screen === 'LOADING') startLoading();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+
+    startLoading();
   }, [screen]);
 
   const hasPlayedClassroomToday = () => {
@@ -95,8 +119,9 @@ export function App() {
               <div className="bg-pink-400 p-4 rounded-full shadow-lg border-4 border-white animate-bounce" style={{ animationDelay: '0.4s' }}><BookOpen className="text-white w-10 h-10" /></div>
           </div>
           <h2 className="text-3xl font-bold text-white mb-2 py-2 text-center leading-relaxed">รอโหลดสักครู่นะครับ</h2>
-          <div className="flex items-center gap-2 text-indigo-50 font-bold mb-8 h-6 text-sm bg-indigo-900/30 px-5 py-1 rounded-full border border-white/20">
-            <CloudSync size={16} className="animate-spin" /> {loadStatus}
+          <div className={`flex items-center gap-2 font-bold mb-8 h-8 text-sm px-5 py-1 rounded-full border border-white/20 transition-all duration-500 ${loadProgress === 100 ? 'bg-green-500 text-white' : 'bg-indigo-900/30 text-indigo-50'}`}>
+            {loadProgress === 100 ? <CheckCircle2 size={16}/> : <CloudSync size={16} className="animate-spin" />} 
+            {loadStatus}
           </div>
           <div className="w-full bg-slate-900/40 h-8 rounded-full overflow-hidden border-4 border-white/30 p-1.5 mb-3 shadow-inner relative">
             <div className="h-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-500 rounded-full transition-all duration-300 shadow-[0_0_20px_rgba(251,191,36,0.6)]" style={{ width: `${loadProgress}%` }}></div>
