@@ -1,88 +1,88 @@
 export type UserRole = 'STUDENT' | 'TEACHER';
-export type ScoringMode = 'CLASSROOM' | 'FREEPLAY';
-export type CharacterType = 'BOY' | 'GIRL' | 'ASTRONAUT' | 'ALIEN' | 'SUPERHERO' | 'NINJA' | 'PRINCESS';
+export type CharacterBase = 'BOY' | 'GIRL';
+export type SkinColor = '#fca5a5' | '#fcd34d' | '#8d5524' | '#e0ac69'; 
+export type CharacterType = 'ASTRONAUT' | 'ALIEN' | 'SUPERHERO' | 'NINJA' | 'PRINCESS';
+export type TileType = 'START' | 'FINISH' | 'NORMAL' | 'QUESTION' | 'TREASURE' | 'TRAP';
+export type ScoringMode = 'CLASSROOM' | 'FREEPLAY'; 
+export type Gender = 'MALE' | 'FEMALE';
+export type ThemeId = 'SPACE' | 'JUNGLE' | 'OCEAN' | 'VOLCANO' | 'CANDY' | 'PIRATE' | 'CITY' | 'DESERT' | 'CASTLE' | 'SKY' | 'WINTER' | 'FARM';
 
-export interface CharacterAppearance {
-  base: CharacterType;
-  skinColor: string;
-  hairStyle?: string;
-  hairColor?: string;
-  accessories?: string[];
+export interface ThemeConfig {
+  id: string;
+  name: string;
+  bgClass: string; 
+  primaryColor: string;
+  secondaryColor: string;
+  decorations: string[];
+  bgmUrls: string[];
+  pathColor?: string;
+  tileColor?: string;
+  tileBorder?: string;
+  player1Char?: string;
+  player2Char?: string;
+  themeBackgrounds?: Record<string, string>;
 }
 
-// [จุดที่หายไป] ต้องมี PlayerState ตรงนี้ครับ
-export interface PlayerState {
+export interface CharacterAppearance {
+  base: CharacterBase;
+  skinColor: SkinColor;
+}
+
+export interface QuestionDetail {
+    questionText: string;
+    isCorrect: boolean;
+    scoreEarned: number;
+}
+
+export interface GameSession {
+    sessionId: string;
+    date: string;       
+    score: number;
+    mode: ScoringMode;
+    timestamp: string;
+    details: QuestionDetail[]; 
+    isManual?: boolean;
+    note?: string;
+    // [เพิ่ม] รองรับข้อมูลจาก Google Sheets
+    realScore?: number;
+    bonusScore?: number;
+}
+
+export interface StudentProfile {
   id: string;
-  firstName?: string;
+  firstName: string;
+  lastName: string;
   nickname: string;
-  gender: 'MALE' | 'FEMALE';
-  character: CharacterType;
-  appearance?: CharacterAppearance;
-  classroom?: string;
-  score: number;
+  gender: Gender;
+  classroom: string;
+  profileImage?: string;
+  appearance: CharacterAppearance;
+  sessions: GameSession[]; 
+}
+
+export interface PlayerState extends StudentProfile {
   position: number;
+  score: number;
+  character: string; 
   calculatorUsesLeft: number;
   isFinished: boolean;
-  sessions?: GameSession[];
-  profileImage?: string; 
 }
 
 export interface MathQuestion {
   id: string;
   question: string;
   answer: number;
-  type: 'ADD' | 'SUBTRACT' | 'MULTIPLY' | 'DIVIDE';
-  difficulty: number;
+  options: number[];
 }
 
-export interface QuestionDetail {
+export interface QuestionLog {
   questionId: string;
   questionText: string;
-  userAnswer: string;
-  correctAnswer: string;
+  correctAnswer: number;
+  studentAnswer: number;
   isCorrect: boolean;
-  timeSpent: number;
   timestamp: string;
-  scoreEarned?: number;
 }
-
-export interface GameSession {
-  sessionId: string;
-  date: string;
-  timestamp: string;
-  score: number;
-  mode: ScoringMode;
-  details: QuestionDetail[];
-}
-
-export interface ThemeConfig {
-  id: string;
-  name: string;
-  bgClass: string;
-  primaryColor: string;
-  secondaryColor: string;
-  decorations: string[];
-  bgmUrls: string[];
-}
-
-export interface StudentProfile extends PlayerState {
-  totalScore?: number;
-}
-
-export interface GameConfig {
-  schoolName: string;
-  educationYear: string;
-  bgmPlaylist: string[];
-  themeBackgrounds: Record<string, string>; 
-}
-
-export interface QuestionSet {
-  classroom: MathQuestion[];
-  freeplay: MathQuestion[];
-}
-
-// [ประเภทข้อมูลใหม่สำหรับแผนที่]
-export type TileType = 'START' | 'FINISH' | 'NORMAL' | 'QUESTION' | 'TREASURE' | 'TRAP';
 
 export interface TileConfig {
     x: number;
@@ -90,9 +90,12 @@ export interface TileConfig {
     type: TileType;
 }
 
-export interface QuestionLog {
-    id: string;
-    text: string;
-    isCorrect: boolean;
-    timestamp: number;
+export interface DailyQuestionSet {
+    date: string;
+    questions: MathQuestion[];
+}
+
+export interface GameGlobalConfig {
+    themeBackgrounds: Record<string, string>; 
+    bgmPlaylist: string[];
 }

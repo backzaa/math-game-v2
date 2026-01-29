@@ -1,121 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import type { MathQuestion } from '../types';
-import { Calculator } from 'lucide-react'; // ลบ Clock ออก
+import React, { useState } from 'react';
+import type { MathQuestion } from '../types'; // แก้บรรทัดนี้ครับ
+import { Calculator, CheckCircle2, XCircle, Frown, PartyPopper } from 'lucide-react';
 
 interface Props {
   question: MathQuestion | null;
-  volume?: number;
-  calculatorUsesLeft?: number;
-  onConsumeCalculator?: () => void;
-  onAnswer: (isCorrect: boolean, usedCalculator: boolean) => void;
+  onAnswer: (correct: boolean, usedCalculator: boolean) => void;
+  volume: number;
+  calculatorUsesLeft: number;
+  onConsumeCalculator: () => void;
 }
 
-export const MathModal: React.FC<Props> = ({ 
-  question, 
-  onAnswer, 
-  calculatorUsesLeft = 0, 
-  onConsumeCalculator 
-}) => {
-  // ไม่ต้องมี state สำหรับเวลา (timeLeft) แล้ว
-  const [options, setOptions] = useState<number[]>([]);
-  const [usedCalc, setUsedCalc] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+const SFX = {
+  CORRECT: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'),
+  WRONG: new Audio('https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3')
+};
 
-  useEffect(() => {
-    if (!question) return;
+export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calculatorUsesLeft, onConsumeCalculator }) => {
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [feedback, setFeedback] = useState<{ isCorrect: boolean; show: boolean }>({ isCorrect: false, show: false });
+  const [calcDisplay, setCalcDisplay] = useState('0');
+  const [usedCalcInThisQuestion, setUsedCalcInThisQuestion] = useState(false);
 
-    // รีเซ็ตค่าเริ่มต้น (ไม่มีรีเซ็ตเวลา)
-    setUsedCalc(false);
-    setSelectedOption(null);
+  const playSound = (isCorrect: boolean) => {
+      const sound = isCorrect ? SFX.CORRECT : SFX.WRONG;
+      sound.currentTime = 0;
+      sound.volume = volume;
+      sound.play().catch(e => console.log("Audio play failed", e));
+  };
 
-    // ระบบสุ่มตัวเลือกเหมือนเดิม
-    let currentOptions = question.options || [];
-    if (!currentOptions || currentOptions.length === 0) {
-       const ans = question.answer;
-       const set = new Set<number>();
-       set.add(ans);
-       while(set.size < 4) {
-           const offset = Math.floor(Math.random() * 10) - 5; 
-           const val = ans + offset;
-           if (val > 0 && val !== ans) set.add(val);
-           else if (val <= 0) set.add(ans + set.size + 1);
-       }
-       currentOptions = Array.from(set).sort(() => Math.random() - 0.5);
-    } else {
-        currentOptions = [...currentOptions].sort(() => Math.random() - 0.5);
+  const speak = (text: string) => {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'th-TH'; 
+        utterance.rate = 1.0; 
+        window.speechSynthesis.speak(utterance);
     }
-    setOptions(currentOptions);
-    
-    // *** ลบส่วน setInterval จับเวลาออกไปเลย ***
-  }, [question]);
+  };
 
   if (!question) return null;
 
-  const handleOptionClick = (option: number) => {
-    if (selectedOption !== null) return;
-    setSelectedOption(option);
+  const handleAnswerClick = (isCorrect: boolean) => {
+    if (feedback.show) return;
     
-    const isCorrect = option === question.answer;
+    playSound(isCorrect);
+    setFeedback({ isCorrect, show: true });
+
+    if (isCorrect) speak("เก่งมาก ถูกต้องครับ");
+    else speak("ไม่เป็นไร เอาใหม่นะ");
     
     setTimeout(() => {
-        onAnswer(isCorrect, usedCalc);
-    }, 500);
+      onAnswer(isCorrect, usedCalcInThisQuestion);
+      setFeedback({ isCorrect: false, show: false });
+      setShowCalculator(false);
+      setUsedCalcInThisQuestion(false);
+      setCalcDisplay('0');
+    }, 2000);
   };
 
-  const handleUseCalculator = () => {
-    if (calculatorUsesLeft > 0 && !usedCalc) {
-      setUsedCalc(true);
-      if (onConsumeCalculator) onConsumeCalculator();
-      setOptions([question.answer]);
-    }
+  const activateCalculator = () => {
+      if (calculatorUsesLeft > 0 && !feedback.show) {
+          setShowCalculator(true);
+          if (!usedCalcInThisQuestion) {
+              onConsumeCalculator(); 
+              setUsedCalcInThisQuestion(true);
+          }
+      }
+  };
+
+  const handleCalcInput = (val: string) => {
+      if(val === 'C') setCalcDisplay('0');
+      else if(val === '=') {
+          try { setCalcDisplay(eval(calcDisplay).toString()); } catch(e) { setCalcDisplay('Error'); }
+      } else setCalcDisplay(prev => prev === '0' ? val : prev + val);
   };
 
   return (
-    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-pop-in">
-      <div className="bg-white rounded-[40px] shadow-[0_0_50px_rgba(79,70,229,0.3)] w-full max-w-md overflow-hidden border-8 border-indigo-600 relative flex flex-col">
-        
-        {/* Header (เหลือแค่ปุ่มตัวช่วย) */}
-        <div className="bg-indigo-600 p-4 flex justify-end items-center text-white z-10 h-16">
-          {calculatorUsesLeft > 0 && !usedCalc && (
-             <button onClick={handleUseCalculator} className="flex items-center gap-2 bg-yellow-400 text-yellow-900 px-4 py-2 rounded-full font-black shadow-lg hover:scale-105 transition active:scale-95 border-2 border-yellow-200">
-                <Calculator size={20}/> ตัวช่วย ({calculatorUsesLeft})
-             </button>
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 animate-pop-in">
+      {feedback.show && (
+        <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+           <div className={`p-10 rounded-3xl text-center border-8 shadow-2xl flex flex-col items-center gap-6 scale-110 ${feedback.isCorrect ? 'bg-green-600 border-green-400' : 'bg-red-600 border-red-400'}`}>
+              {feedback.isCorrect ? (
+                <>
+                  <CheckCircle2 size={140} className="text-white animate-bounce" />
+                  <div><h2 className="text-6xl font-black text-white drop-shadow-lg mb-2">ถูกต้อง!</h2></div>
+                  {usedCalcInThisQuestion && <div className="text-yellow-300 font-bold bg-black/30 px-4 py-1 rounded-full">+5 คะแนน (ใช้ตัวช่วย)</div>}
+                  {!usedCalcInThisQuestion && <div className="text-white font-bold bg-black/30 px-4 py-1 rounded-full">+10 คะแนน</div>}
+                  <PartyPopper size={60} className="text-yellow-300 animate-spin-slow" />
+                </>
+              ) : (
+                <>
+                  <XCircle size={140} className="text-white animate-pulse" />
+                   <div><h2 className="text-6xl font-black text-white drop-shadow-lg mb-2">ผิดนิดนึง</h2></div>
+                  <Frown size={60} className="text-slate-200" />
+                </>
+              )}
+           </div>
+        </div>
+      )}
+
+       <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl">
+          {showCalculator && (
+              <div className="absolute inset-0 z-10 bg-slate-800 rounded-2xl p-4 flex flex-col border-4 border-orange-500">
+                  <div className="flex justify-between items-center mb-2">
+                      <span className="text-orange-400 font-bold flex items-center gap-2"><Calculator/> เครื่องคิดเลข</span>
+                      <span className="text-xs text-slate-400">ใช้สิทธิ์แล้ว</span>
+                  </div>
+                  <div className="bg-black text-green-400 font-mono text-4xl p-4 text-right rounded mb-4 shadow-inner">{calcDisplay}</div>
+                  <div className="grid grid-cols-4 gap-2 flex-1">
+                      {[7,8,9,'/',4,5,6,'*',1,2,3,'-',0,'C','=','+'].map(b => (
+                          <button key={b} onClick={()=>handleCalcInput(b.toString())} className="bg-slate-700 text-white text-xl font-bold rounded hover:bg-slate-600 active:scale-95 transition">{b}</button>
+                      ))}
+                  </div>
+                  <button onClick={()=>setShowCalculator(false)} className="mt-4 bg-red-500 text-white py-3 rounded-lg font-bold">ซ่อนเครื่องคิดเลข</button>
+              </div>
           )}
-        </div>
 
-        {/* โจทย์ (ปรับให้ใหญ่ขึ้นเพราะที่ว่างเยอะขึ้น) */}
-        <div className="p-10 text-center bg-indigo-50 flex-1 flex flex-col justify-center items-center">
-          <div className="text-6xl md:text-7xl font-black text-slate-700 mb-4 font-mono tracking-widest drop-shadow-sm">
-            {question.question}
+          <div className="mb-8 text-center">
+            <h2 className="text-2xl text-slate-400 font-bold mb-4">คำถามคณิตศาสตร์</h2>
+            <div className="bg-black/40 rounded-2xl p-6 border-2 border-slate-500">
+                 <span className="text-6xl font-mono text-white font-bold tracking-wider">{question.question} = ?</span>
+            </div>
           </div>
-          <div className="text-4xl text-slate-400 font-bold">= ?</div>
-        </div>
 
-        {/* ปุ่มตัวเลือก */}
-        <div className="p-6 bg-slate-100 grid grid-cols-2 gap-4">
-          {options.map((opt, idx) => {
-             let btnClass = "bg-white text-slate-700 hover:bg-indigo-50 border-slate-200"; 
-             if (selectedOption !== null) {
-                 if (opt === question.answer) btnClass = "bg-green-500 text-white border-green-600 shadow-[0_4px_0_#15803d]"; 
-                 else if (opt === selectedOption) btnClass = "bg-red-500 text-white border-red-600 shadow-[0_4px_0_#b91c1c]"; 
-                 else btnClass = "bg-slate-200 text-slate-400 opacity-50"; 
-             } else {
-                 btnClass += " shadow-[0_6px_0_#cbd5e1] active:shadow-none active:translate-y-2 border-b-4";
-             }
-
-             return (
-                <button 
-                    key={idx} 
-                    onClick={() => handleOptionClick(opt)}
-                    disabled={selectedOption !== null}
-                    className={`h-24 rounded-2xl text-4xl font-black transition-all flex items-center justify-center border-2 ${btnClass}`}
-                >
-                    {opt}
-                </button>
-             );
-          })}
-        </div>
-      </div>
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            {question.options.map((opt, i) => (
+              <button key={i} onClick={() => handleAnswerClick(opt === question.answer)} className="bg-white hover:bg-blue-50 active:scale-95 text-slate-900 text-5xl font-bold py-6 rounded-2xl shadow-[0_6px_0_#cbd5e1] border-2 border-slate-300 transition-all hover:-translate-y-1">
+                {opt}
+              </button>
+            ))}
+          </div>
+          
+          <div className="flex justify-center border-t border-slate-700 pt-6">
+              <button 
+                disabled={calculatorUsesLeft <= 0 && !usedCalcInThisQuestion} 
+                onClick={activateCalculator} 
+                className={`flex flex-col items-center gap-2 group ${calculatorUsesLeft <= 0 && !usedCalcInThisQuestion ? 'opacity-30 grayscale cursor-not-allowed' : 'hover:scale-105 transition'}`}
+              >
+                  <div className="w-16 h-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg group-hover:shadow-orange-500/50 border-4 border-orange-400 relative">
+                      <Calculator color="white" size={32}/>
+                      <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow">
+                          {calculatorUsesLeft}
+                      </div>
+                  </div>
+                  <div className="flex flex-col items-center">
+                      <span className="text-sm font-bold text-orange-400">เครื่องคิดเลข</span>
+                      <span className="text-[10px] text-slate-500">เหลือ {calculatorUsesLeft} ครั้ง (คะแนนหาร 2)</span>
+                  </div>
+              </button>
+          </div>
+       </div>
     </div>
   );
 };

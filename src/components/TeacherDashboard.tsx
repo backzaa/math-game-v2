@@ -1,283 +1,354 @@
 import React, { useState, useEffect } from 'react';
-import type { StudentProfile, MathQuestion, GameConfig } from '../types';
-import { StorageService } from '../services/storage';
-import { Users, BookOpen, Settings, LogOut, Plus, Trash2, Save, Image as ImageIcon, Music, Layout, Trophy, BarChart } from 'lucide-react';
+import { StorageService } from '../services/storage'; 
+import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types'; // แก้บรรทัดนี้ครับ
+import { LogOut, Trash2, UserPlus, Users, Palette, ChevronRight, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
+  onUpdateBgm?: (url: string) => void;
+  onUpdateQuestions?: (qs: MathQuestion[]) => void;
 }
 
 export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'STUDENTS' | 'QUESTIONS' | 'SETTINGS' | 'SUMMARY'>('STUDENTS');
+  const [activeTab, setActiveTab] = useState<'REPORTS' | 'QUESTIONS' | 'STUDENTS' | 'ASSETS'>('REPORTS');
+  const [reportMode, setReportMode] = useState<ScoringMode>('CLASSROOM');
   const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
+
+  const [questionSettingMode, setQuestionSettingMode] = useState<'CLASSROOM' | 'FREEPLAY'>('CLASSROOM');
   
-  // State สำหรับจัดการโจทย์
-  const [questionMode, setQuestionMode] = useState<'CLASSROOM' | 'FREEPLAY'>('CLASSROOM');
-  const [questions, setQuestions] = useState<MathQuestion[]>([]);
-  
-  // State สำหรับ Config
-  const [config, setConfig] = useState<GameConfig>({
-      schoolName: '', educationYear: '', bgmPlaylist: [], themeBackgrounds: {}
+  const [randomConfig, setRandomConfig] = useState({ 
+      count: 10, 
+      min: 1, 
+      max: 20, 
+      operators: { add: true, sub: true, mul: false, div: false } 
   });
-
-  // State สำหรับ Form เพิ่มนักเรียน
-  const [newStudent, setNewStudent] = useState<Partial<StudentProfile>>({ gender: 'MALE', character: 'BOY' });
   
-  // State สำหรับ Form เพิ่มโจทย์
-  const [newQ, setNewQ] = useState({ q: '', a: '', diff: 1 });
+  const [generatedQuestions, setGeneratedQuestions] = useState<MathQuestion[]>([]);
+  const [newCustomQ, setNewCustomQ] = useState({ q: '', opts: ['', '', '', ''], correctIdx: 0 });
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab, questionMode]);
+  const [gameConfig, setGameConfig] = useState<{ themeBackgrounds: Record<string, string>, bgmPlaylist: string[] }>({ themeBackgrounds: {}, bgmPlaylist: [] });
+  const [bgmInput, setBgmInput] = useState('');
+  const [isEditingStudent, setIsEditingStudent] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [studentForm, setStudentForm] = useState({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE' as Gender, classroom: '', profileImage: '', base: 'BOY' as CharacterBase, skinColor: '#fcd34d' as SkinColor });
 
-  const loadData = () => {
-    setStudents(StorageService.getStudents());
-    const allQ = StorageService.getAllQuestions();
-    setQuestions(questionMode === 'CLASSROOM' ? allQ.classroom : allQ.freeplay);
-    setConfig(StorageService.getGameConfig());
+  const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
+
+  const refreshData = async () => { 
+      try {
+          await StorageService.syncFromCloud(); 
+          setStudents(StorageService.getAllStudents()); 
+          const cfg = StorageService.getGameConfig();
+          if(cfg) {
+              setGameConfig({ themeBackgrounds: cfg.themeBackgrounds || {}, bgmPlaylist: cfg.bgmPlaylist || [] });
+              setBgmInput((cfg.bgmPlaylist || []).join('\n'));
+          }
+          const currentQs = questionSettingMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayPool(); 
+          setGeneratedQuestions(Array.isArray(currentQs) ? currentQs : []);
+      } catch (e) { console.error("Sync Error:", e); }
   };
 
-  // --- Logic นักเรียน ---
-  const handleAddStudent = () => {
-    if (!newStudent.id || !newStudent.firstName) return alert('กรุณากรอกข้อมูลให้ครบ');
-    const student: StudentProfile = {
-      id: newStudent.id,
-      firstName: newStudent.firstName,
-      nickname: newStudent.nickname || '',
-      gender: newStudent.gender as any,
-      character: newStudent.gender === 'MALE' ? 'BOY' : 'GIRL',
-      classroom: newStudent.classroom || '',
-      score: 0, position: 0, calculatorUsesLeft: 3, isFinished: false,
-      profileImage: newStudent.profileImage // บันทึกรูปภาพ
-    };
-    StorageService.saveStudent(student);
-    setNewStudent({ gender: 'MALE', character: 'BOY' });
-    loadData();
+  useEffect(() => { refreshData(); }, [activeTab, questionSettingMode]);
+
+  const handleGenerateRandom = () => { 
+      const generated: MathQuestion[] = [];
+      const ops: string[] = [];
+      if (randomConfig.operators.add) ops.push('+');
+      if (randomConfig.operators.sub) ops.push('-');
+      if (randomConfig.operators.mul) ops.push('×');
+      if (randomConfig.operators.div) ops.push('÷');
+
+      if (ops.length === 0) { alert('กรุณาเลือกเครื่องหมายอย่างน้อย 1 อย่าง'); return; }
+      
+      const count = questionSettingMode === 'CLASSROOM' ? 10 : randomConfig.count; 
+      
+      for(let i=0; i < count; i++) { 
+          const op = ops[Math.floor(Math.random() * ops.length)];
+          let a = Math.floor(Math.random() * (randomConfig.max - randomConfig.min + 1)) + randomConfig.min;
+          let b = Math.floor(Math.random() * (randomConfig.max - randomConfig.min + 1)) + randomConfig.min;
+          
+          let qStr = '', ans = 0;
+          if (op === '+') { ans = a + b; qStr = `${a} + ${b}`; }
+          else if (op === '-') { if (a < b) [a, b] = [b, a]; ans = a - b; qStr = `${a} - ${b}`; }
+          else if (op === '×') { ans = a * b; qStr = `${a} × ${b}`; }
+          else if (op === '÷') { ans = a; a = a * b; qStr = `${a} ÷ ${b}`; }
+
+          const options = new Set<number>([ans]);
+          while(options.size < 4) {
+              const fake = ans + (Math.floor(Math.random() * 11) - 5);
+              if (fake >= 0 && fake !== ans) options.add(fake);
+          }
+          generated.push({ id: Date.now() + '_' + i, question: qStr, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) }); 
+      } 
+      setGeneratedQuestions(generated); 
   };
 
-  // --- Logic โจทย์ ---
-  const handleAddQuestion = () => {
-      if (!newQ.q || !newQ.a) return;
-      const newQuestion: MathQuestion = {
-          id: Date.now().toString(),
-          question: newQ.q,
-          answer: parseInt(newQ.a),
-          type: 'ADD', // Default
-          difficulty: newQ.diff
-      };
-      const currentList = [...questions, newQuestion];
-      StorageService.saveQuestions(currentList, questionMode);
-      setQuestions(currentList);
-      setNewQ({ q: '', a: '', diff: 1 });
+  const handleAddCustom = () => {
+    if (!newCustomQ.q || newCustomQ.opts.some(o => o === '')) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
+    const ans = parseInt(newCustomQ.opts[newCustomQ.correctIdx]);
+    const opts = newCustomQ.opts.map(o => parseInt(o));
+    const newQ = { id: Date.now().toString(), question: newCustomQ.q, answer: ans, options: opts };
+    if (questionSettingMode === 'CLASSROOM' && generatedQuestions.length >= 10) {
+        if(confirm("โหมดหรรษาต้องมี 10 ข้อ ต้องการเขียนทับข้อเดิมหรือไม่?")) setGeneratedQuestions([...generatedQuestions.slice(0, 9), newQ]);
+    } else { setGeneratedQuestions([...generatedQuestions, newQ]); setNewCustomQ({ q: '', opts: ['', '', '', ''], correctIdx: 0 }); }
   };
 
-  const handleDeleteQuestion = (id: string) => {
-      const newList = questions.filter(q => q.id !== id);
-      StorageService.saveQuestions(newList, questionMode);
-      setQuestions(newList);
+  const handleSaveQuestions = async () => {
+    try {
+        if (questionSettingMode === 'CLASSROOM') {
+            if (generatedQuestions.length !== 10) { alert('โหมดห้องเรียนหรรษาต้องมีครบ 10 ข้อครับ'); return; }
+            await StorageService.saveDailyQuestions(generatedQuestions);
+        } else { await StorageService.saveFreeplayQuestions(generatedQuestions); }
+        alert('บันทึกโจทย์สำเร็จแล้วครับ!'); refreshData();
+    } catch (error) { alert('เกิดข้อผิดพลาดในการบันทึก'); }
   };
 
-  // --- Logic Settings ---
-  const handleSaveConfig = () => {
-      StorageService.saveGameConfig(config);
-      alert('บันทึกการตั้งค่าเรียบร้อย');
+  const handleSaveStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentForm.id || !studentForm.firstName) return;
+    if (isEditingStudent && editingStudentId) StorageService.updateStudent(editingStudentId, { ...studentForm }); 
+    else StorageService.registerStudent(studentForm.id, studentForm.firstName, studentForm.lastName, studentForm.nickname, studentForm.gender, studentForm.classroom, studentForm.profileImage || '');
+    setStudentForm({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE', classroom: '', profileImage: '', base: 'BOY', skinColor: '#fcd34d' });
+    setIsEditingStudent(false); refreshData();
   };
 
-  const handleAddMusic = () => {
-      const url = prompt("กรุณาใส่ลิงก์เพลง (mp3/youtube):");
-      if (url) {
-          setConfig(prev => ({ ...prev, bgmPlaylist: [...prev.bgmPlaylist, url] }));
-      }
+  const handleEditStudentClick = (s: StudentProfile) => {
+      setStudentForm({ id: s.id, firstName: s.firstName, lastName: s.lastName, nickname: s.nickname, gender: s.gender, classroom: s.classroom, profileImage: s.profileImage || '', base: s.appearance?.base || 'BOY', skinColor: s.appearance?.skinColor || '#fcd34d' });
+      setIsEditingStudent(true); setEditingStudentId(s.id); setActiveTab('STUDENTS');
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans">
-      {/* Header */}
-      <div className="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center sticky top-0 z-50 shadow-lg">
-        <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-lg"><Settings size={24} /></div>
-            <div>
-                <h1 className="text-xl font-bold">ระบบจัดการครู</h1>
-                <p className="text-xs text-slate-400">{config.schoolName || 'ยินดีต้อนรับ'}</p>
-            </div>
-        </div>
-        <button onClick={onLogout} className="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg hover:bg-red-500 hover:text-white transition flex items-center gap-2">
-            <LogOut size={18} /> ออกจากระบบ
-        </button>
-      </div>
+    <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
+       <header className="flex-none bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center z-10">
+          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">ระบบจัดการคุณครู</h1>
+          <div className="flex gap-4">
+             <button onClick={() => setActiveTab('REPORTS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>ผลการเรียน</button>
+             <button onClick={() => setActiveTab('QUESTIONS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>จัดการโจทย์</button>
+             <button onClick={() => setActiveTab('ASSETS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>ตั้งค่าเกม</button>
+             <button onClick={() => setActiveTab('STUDENTS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>รายชื่อนักเรียน</button>
+             <button onClick={onLogout} className="text-red-400 hover:text-white flex items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20"><LogOut size={18}/> ออก</button>
+          </div>
+       </header>
 
-      <div className="flex flex-col md:flex-row h-[calc(100vh-80px)]">
-        {/* Sidebar Menu */}
-        <div className="w-full md:w-64 bg-slate-800/50 p-4 space-y-2 border-r border-slate-700">
-            <button onClick={() => setActiveTab('STUDENTS')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-700 text-slate-300'}`}><Users size={20} /> รายชื่อนักเรียน</button>
-            <button onClick={() => setActiveTab('QUESTIONS')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition ${activeTab === 'QUESTIONS' ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-slate-700 text-slate-300'}`}><BookOpen size={20} /> จัดการโจทย์</button>
-            <button onClick={() => setActiveTab('SUMMARY')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition ${activeTab === 'SUMMARY' ? 'bg-amber-600 text-white shadow-lg' : 'hover:bg-slate-700 text-slate-300'}`}><BarChart size={20} /> สรุปคะแนน</button>
-            <button onClick={() => setActiveTab('SETTINGS')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition ${activeTab === 'SETTINGS' ? 'bg-purple-600 text-white shadow-lg' : 'hover:bg-slate-700 text-slate-300'}`}><Layout size={20} /> ตั้งค่าเกม</button>
-        </div>
+       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+       
+       {activeTab === 'QUESTIONS' && (
+           <div className="max-w-6xl mx-auto bg-slate-800 p-6 rounded-xl border border-slate-700 animate-pop-in">
+               <div className="flex justify-center gap-4 mb-6 bg-slate-900/50 p-2 rounded-xl w-fit mx-auto">
+                   <button onClick={() => setQuestionSettingMode('CLASSROOM')} className={`px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition ${questionSettingMode==='CLASSROOM' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-400'}`}><Star/> ห้องเรียนหรรษา</button>
+                   <button onClick={() => setQuestionSettingMode('FREEPLAY')} className={`px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition ${questionSettingMode==='FREEPLAY' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400'}`}><Gamepad2/> เล่นตามใจ</button>
+               </div>
+               <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                   <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Calendar/> {questionSettingMode === 'CLASSROOM' ? 'โจทย์ประจำวัน (บังคับ 10 ข้อ)' : 'คลังโจทย์หลัก (สุ่มมาเล่น)'}</h2>
+                   <button onClick={handleSaveQuestions} className="bg-green-600 px-6 py-3 rounded-xl font-bold hover:bg-green-500 shadow-lg flex items-center gap-2 transition-all active:scale-95"><Save/> บันทึกโจทย์</button>
+               </div>
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                   <div className="space-y-6">
+                       <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-600">
+                           <h3 className="font-bold text-lg text-slate-300 mb-4 border-b border-slate-700 pb-2">1. สุ่มโจทย์อัตโนมัติ</h3>
+                           <div className="grid grid-cols-2 gap-4 mb-4">
+                               <div className="flex-1"><label className="block text-xs text-slate-400 mb-1">เลขต่ำสุด-สูงสุด</label>
+                                 <div className="flex gap-2">
+                                     <input type="number" value={randomConfig.min} onChange={e=>setRandomConfig({...randomConfig, min: parseInt(e.target.value)})} className="bg-slate-800 w-1/2 p-2 rounded border border-slate-500 text-center"/>
+                                     <input type="number" value={randomConfig.max} onChange={e=>setRandomConfig({...randomConfig, max: parseInt(e.target.value)})} className="bg-slate-800 w-1/2 p-2 rounded border border-slate-500 text-center"/>
+                                 </div>
+                               </div>
+                               {questionSettingMode === 'FREEPLAY' && (
+                                 <div><label className="block text-xs text-slate-400 mb-1">จำนวนข้อในคลัง</label><input type="number" value={randomConfig.count} onChange={e=>setRandomConfig({...randomConfig, count: parseInt(e.target.value)})} className="bg-slate-800 w-full p-2 rounded border border-slate-500 text-center"/></div>
+                               )}
+                           </div>
+                           <div className="mb-4">
+                               <label className="block text-xs text-slate-400 mb-2 font-bold">เลือกเครื่องหมาย</label>
+                               <div className="grid grid-cols-4 gap-2">
+                                   {['add', 'sub', 'mul', 'div'].map(op => (
+                                       <button key={op} onClick={() => setRandomConfig({...randomConfig, operators:{...randomConfig.operators, [op as keyof typeof randomConfig.operators]: !randomConfig.operators[op as keyof typeof randomConfig.operators]}})} className={`py-2 rounded-lg font-bold border-2 transition-all ${randomConfig.operators[op as keyof typeof randomConfig.operators] ? 'bg-blue-600 border-blue-400 text-white shadow-inner' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
+                                           {op === 'add' ? '+' : op === 'sub' ? '-' : op === 'mul' ? '×' : '÷'}
+                                       </button>
+                                   ))}
+                               </div>
+                           </div>
+                           <button onClick={handleGenerateRandom} className="w-full bg-blue-600 py-3 rounded-xl font-bold hover:bg-blue-500 flex justify-center gap-2 items-center"><Shuffle size={20}/> สุ่มโจทย์ใหม่</button>
+                       </div>
+                       <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-600">
+                           <h3 className="font-bold text-lg text-slate-300 mb-3">2. ตั้งโจทย์เอง (4 ตัวเลือก)</h3>
+                           <input placeholder="โจทย์ (เช่น 25 + 14)" value={newCustomQ.q} onChange={e=>setNewCustomQ({...newCustomQ, q: e.target.value})} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-500 mb-4 focus:border-pink-500 outline-none"/>
+                           <label className="block text-xs text-slate-400 mb-2">* ติ๊กวงกลมหน้าคำตอบที่ถูกต้อง</label>
+                           <div className="grid grid-cols-2 gap-3 mb-4">
+                               {newCustomQ.opts.map((opt, idx) => (
+                                   <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition ${newCustomQ.correctIdx === idx ? 'border-green-500 bg-green-500/10' : 'border-slate-600'}`}>
+                                       <input type="radio" name="correctQ" checked={newCustomQ.correctIdx === idx} onChange={() => setNewCustomQ({...newCustomQ, correctIdx: idx})} className="w-4 h-4 accent-green-500 cursor-pointer"/>
+                                       <input placeholder={`ตัวเลือกที่ ${idx+1}`} value={opt} onChange={e => { const n = [...newCustomQ.opts]; n[idx] = e.target.value; setNewCustomQ({...newCustomQ, opts: n}); }} className="bg-transparent w-full outline-none text-sm"/>
+                                   </div>
+                               ))}
+                           </div>
+                           <button onClick={handleAddCustom} className="w-full bg-pink-600 py-3 rounded-xl font-bold hover:bg-pink-500 flex justify-center gap-2 items-center"><PlusCircle size={20}/> เพิ่มโจทย์ลงรายการ</button>
+                       </div>
+                   </div>
+                   <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 h-[650px] flex flex-col shadow-inner">
+                       <h3 className="font-bold text-lg text-slate-300 mb-2 text-center border-b border-slate-700 pb-2 flex justify-between items-center">
+                           <span>รายการโจทย์ ({generatedQuestions.length} ข้อ)</span>
+                           <button onClick={() => setGeneratedQuestions([])} className="text-xs text-red-400 hover:underline">ล้างทั้งหมด</button>
+                       </h3>
+                       <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                           {generatedQuestions.length === 0 ? (
+                               <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50"><Gamepad2 size={48} className="mb-2"/><p>ยังไม่มีโจทย์</p></div>
+                           ) : (
+                               generatedQuestions.map((q, i) => (
+                                   <div key={q.id || i} className="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 group hover:border-blue-500/50 transition">
+                                       <div><span className="text-slate-500 font-mono mr-3">#{i+1}</span><span className="text-lg font-bold">{q.question}</span></div>
+                                       <div className="flex items-center gap-4">
+                                           <span className="text-green-400 font-black text-xl">= {q.answer}</span>
+                                           <button onClick={() => setGeneratedQuestions(generatedQuestions.filter((_, idx) => idx !== i))} className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={18}/></button>
+                                       </div>
+                                   </div>
+                               ))
+                           )}
+                       </div>
+                   </div>
+               </div>
+           </div>
+       )}
 
-        {/* Content Area */}
-        <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-900">
-            
-            {/* --- TAB: นักเรียน --- */}
-            {activeTab === 'STUDENTS' && (
-                <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Plus className="text-blue-400"/> เพิ่มนักเรียนใหม่</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <input placeholder="เลขที่ / ID" className="bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newStudent.id || ''} onChange={e => setNewStudent({...newStudent, id: e.target.value})} />
-                            <input placeholder="ชื่อจริง" className="bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newStudent.firstName || ''} onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} />
-                            <input placeholder="ชื่อเล่น" className="bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newStudent.nickname || ''} onChange={e => setNewStudent({...newStudent, nickname: e.target.value})} />
-                            <input placeholder="ห้องเรียน (เช่น ป.1/2)" className="bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newStudent.classroom || ''} onChange={e => setNewStudent({...newStudent, classroom: e.target.value})} />
-                            <select className="bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newStudent.gender} onChange={e => setNewStudent({...newStudent, gender: e.target.value as any})}>
-                                <option value="MALE">ชาย</option> <option value="FEMALE">หญิง</option>
-                            </select>
-                            <div className="flex gap-2">
-                                <input placeholder="ลิ้งค์รูปโปรไฟล์ (ถ้ามี)" className="bg-slate-900 border border-slate-600 p-3 rounded-xl flex-1" value={newStudent.profileImage || ''} onChange={e => setNewStudent({...newStudent, profileImage: e.target.value})} />
-                                {newStudent.profileImage && <img src={newStudent.profileImage} className="w-12 h-12 rounded-full object-cover border-2 border-white" />}
+       {activeTab === 'ASSETS' && (
+           <div className="max-w-6xl mx-auto bg-slate-800 p-8 rounded-xl border border-slate-700 animate-pop-in">
+               <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-bold flex items-center gap-2"><Palette/> ตั้งค่าฉากและเสียง</h2><p className="text-xs text-green-400 animate-pulse bg-green-900/20 px-4 py-2 rounded-full border border-green-800">● บันทึกลง Google Sheet อัตโนมัติ</p></div>
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                   <div className="space-y-4">
+                       <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4"><HardDrive/> ภาพพื้นหลังฉากต่างๆ</h3>
+                       <div className="grid grid-cols-1 gap-4 max-h-[550px] overflow-y-auto pr-3 custom-scrollbar">
+                           {THEME_IDS.map((theme) => (
+                               <div key={theme.id} className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 hover:border-blue-500/50 transition">
+                                   <label className="block text-sm font-bold text-blue-300 mb-2">{theme.label}</label>
+                                   <div className="flex gap-3">
+                                       <input type="text" placeholder="URL รูปภาพ..." value={gameConfig.themeBackgrounds[theme.id] || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
+                                       {gameConfig.themeBackgrounds[theme.id] && (<div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg"><img src={gameConfig.themeBackgrounds[theme.id]} alt="p" className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>)}
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                   </div>
+                   <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-600 sticky top-0 h-fit shadow-2xl">
+                       <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4"><Music/> รายการเพลงประกอบ (BGM)</h3>
+                       <textarea value={bgmInput} onChange={e => setBgmInput(e.target.value)} placeholder={`วาง URL เพลงบรรทัดละ 1 เพลง`} className="w-full bg-slate-800 p-4 rounded-xl border border-slate-500 text-white focus:border-green-500 outline-none mb-4 h-80 font-mono text-sm shadow-inner" />
+                   </div>
+               </div>
+           </div>
+       )}
+
+       {activeTab === 'STUDENTS' && (
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full animate-pop-in">
+               <div className="md:col-span-1 bg-slate-800 p-6 rounded-xl border border-slate-700 h-fit shadow-xl">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">{isEditingStudent ? <><Edit3/> แก้ไขนักเรียน</> : <><UserPlus/> เพิ่มนักเรียนใหม่</>}</h2>
+                  <form onSubmit={handleSaveStudent} className="space-y-4">
+                      <input type="text" placeholder="เลขที่ (เช่น 01)" value={studentForm.id} onChange={e=>setStudentForm({...studentForm, id:e.target.value})} className="w-full bg-slate-700 p-3 rounded-xl border border-slate-600 text-white font-bold focus:border-blue-500 outline-none"/>
+                      <div className="flex gap-2"><input type="text" placeholder="ชื่อจริง" value={studentForm.firstName} onChange={e=>setStudentForm({...studentForm, firstName:e.target.value})} className="w-full bg-slate-700 p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none"/><input type="text" placeholder="นามสกุล" value={studentForm.lastName} onChange={e=>setStudentForm({...studentForm, lastName:e.target.value})} className="w-full bg-slate-700 p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none"/></div>
+                      <div className="flex gap-2"><input type="text" placeholder="ชื่อเล่น" value={studentForm.nickname} onChange={e=>setStudentForm({...studentForm, nickname:e.target.value})} className="w-full bg-slate-700 p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none"/><input type="text" placeholder="ชั้น/ห้อง" value={studentForm.classroom} onChange={e=>setStudentForm({...studentForm, classroom:e.target.value})} className="w-full bg-slate-700 p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none"/></div>
+                      <div className="flex gap-3">
+                        <input type="text" placeholder="ลิงก์รูปประจำตัว" value={studentForm.profileImage} onChange={e=>setStudentForm({...studentForm, profileImage:e.target.value})} className="flex-1 bg-slate-700 p-3 rounded-xl border border-slate-600 focus:border-blue-500 outline-none"/>
+                        {studentForm.profileImage && (
+                            <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-slate-600 shrink-0 bg-white">
+                                <img src={studentForm.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             </div>
+                        )}
+                      </div>
+                      <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 text-center"><label className="block text-sm text-slate-300 mb-3 font-bold uppercase">เพศ</label><div className="flex gap-2"><button type="button" onClick={()=>setStudentForm({...studentForm, gender:'MALE'})} className={`flex-1 py-3 rounded-xl font-bold transition-all ${studentForm.gender==='MALE'?'bg-blue-600 shadow-lg text-white':'bg-slate-700 text-slate-400'}`}>ชาย</button><button type="button" onClick={()=>setStudentForm({...studentForm, gender:'FEMALE'})} className={`flex-1 py-3 rounded-xl font-bold transition-all ${studentForm.gender==='FEMALE'?'bg-pink-600 shadow-lg text-white':'bg-slate-700 text-slate-400'}`}>หญิง</button></div></div>
+                      <button type="submit" className="w-full bg-green-600 py-4 rounded-xl font-black text-xl hover:bg-green-500 shadow-lg transition-all">บันทึกข้อมูล</button>
+                  </form>
+               </div>
+               <div className="md:col-span-2 flex flex-col gap-4 h-full">
+                  <h2 className="text-xl font-bold flex items-center gap-2"><Users /> รายชื่อนักเรียน ({students.length})</h2>
+                  <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                    {students.map(s => (
+                      <div key={s.id} className="bg-slate-700/50 p-4 rounded-xl flex justify-between items-center group hover:bg-slate-700 transition border border-transparent hover:border-blue-500/30">
+                        <div className="flex items-center gap-4">
+                          {s.profileImage ? (
+                            <img src={s.profileImage} alt={s.firstName} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-white border-2 border-white shadow-md ${s.gender==='MALE' ? 'bg-blue-600' : 'bg-pink-600'}`}>{s.id}</div>
+                          )}
+                          <div><div className="font-bold text-lg">{s.firstName} {s.lastName} ({s.nickname})</div><div className="text-xs text-slate-400 uppercase tracking-widest bg-slate-900/50 px-2 py-0.5 rounded-full w-fit mt-1 border border-slate-600">ห้อง {s.classroom}</div></div>
                         </div>
-                        <button onClick={handleAddStudent} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold shadow-lg transition">บันทึกนักเรียน</button>
-                    </div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button><button onClick={() => { if(confirm(`ยืนยันลบ ${s.firstName}?`)) { StorageService.deleteStudent(s.id); refreshData(); } }} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button></div>
+                      </div>
+                    ))}
+                  </div>
+               </div>
+           </div>
+       )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {students.map(s => (
-                            <div key={s.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center group">
-                                <div className="flex items-center gap-4">
-                                    {s.profileImage ? <img src={s.profileImage} className="w-12 h-12 rounded-full object-cover" /> : <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">🎓</div>}
-                                    <div>
-                                        <div className="font-bold text-lg">{s.firstName} <span className="text-sm text-slate-400">({s.nickname})</span></div>
-                                        <div className="text-xs text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full inline-block">ห้อง {s.classroom}</div>
-                                    </div>
-                                </div>
-                                <button onClick={() => { if(confirm('ลบ?')) { StorageService.deleteStudent(s.id); loadData(); } }} className="text-red-400 hover:bg-red-400/20 p-2 rounded-lg"><Trash2 size={20} /></button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* --- TAB: โจทย์ --- */}
-            {activeTab === 'QUESTIONS' && (
-                <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 mb-6">
-                        <button onClick={() => setQuestionMode('CLASSROOM')} className={`flex-1 py-2 rounded-lg font-bold transition ${questionMode === 'CLASSROOM' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>ห้องเรียนหรรษา (เก็บคะแนน)</button>
-                        <button onClick={() => setQuestionMode('FREEPLAY')} className={`flex-1 py-2 rounded-lg font-bold transition ${questionMode === 'FREEPLAY' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}>เล่นตามใจ (ฝึกฝน)</button>
-                    </div>
-
-                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-                        <h2 className="text-xl font-bold mb-4">สร้างโจทย์ใหม่ ({questionMode === 'CLASSROOM' ? 'สำหรับวันนี้' : 'สุ่มทั่วไป'})</h2>
-                        <div className="flex gap-4 mb-4">
-                            <input placeholder="โจทย์ (เช่น 5 + 5)" className="flex-[2] bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newQ.q} onChange={e => setNewQ({...newQ, q: e.target.value})} />
-                            <input placeholder="คำตอบ" type="number" className="flex-1 bg-slate-900 border border-slate-600 p-3 rounded-xl" value={newQ.a} onChange={e => setNewQ({...newQ, a: e.target.value})} />
+       {activeTab === 'REPORTS' && (
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full animate-pop-in">
+               <div className="md:col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col h-[600px]">
+                  <div className="p-4 bg-slate-700 font-bold text-slate-300 flex items-center gap-2"><Users size={20}/> รายชื่อนักเรียน</div>
+                  <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                    {students.map(s => (
+                      <div key={s.id} onClick={() => setSelectedStudent(s)} className={`p-4 rounded-xl cursor-pointer flex justify-between items-center transition ${selectedStudent?.id === s.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-700/50 hover:bg-slate-600'}`}>
+                        <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-600 border border-white/20">
+                             {s.profileImage ? (<img src={s.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />) : (<div className="w-full h-full flex items-center justify-center text-[10px]">{s.id}</div>)}
+                           </div>
+                           <div><span className="font-bold">No. {s.id}</span> {s.firstName}</div>
                         </div>
-                        <button onClick={handleAddQuestion} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-xl font-bold shadow-lg">เพิ่มโจทย์</button>
-                    </div>
-
-                    <div className="space-y-3">
-                        {questions.map((q, idx) => (
-                            <div key={q.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center">
-                                <div className="text-xl font-mono font-bold text-slate-200"><span className="text-slate-500 mr-4">#{idx+1}</span> {q.question} = <span className="text-green-400">{q.answer}</span></div>
-                                <button onClick={() => handleDeleteQuestion(q.id)} className="text-red-400 hover:bg-red-400/20 p-2 rounded-lg"><Trash2 size={20} /></button>
-                            </div>
-                        ))}
-                        {questions.length === 0 && <div className="text-center text-slate-500 py-10">ยังไม่มีโจทย์ในหมวดนี้</div>}
-                    </div>
-                </div>
-            )}
-
-            {/* --- TAB: ตั้งค่า --- */}
-            {activeTab === 'SETTINGS' && (
-                <div className="max-w-3xl mx-auto space-y-6">
-                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Layout /> ข้อมูลโรงเรียน</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm text-slate-400 mb-1">ชื่อโรงเรียน</label>
-                                <input className="w-full bg-slate-900 border border-slate-600 p-3 rounded-xl" value={config.schoolName} onChange={e => setConfig({...config, schoolName: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-slate-400 mb-1">ปีการศึกษา</label>
-                                <input className="w-full bg-slate-900 border border-slate-600 p-3 rounded-xl" value={config.educationYear} onChange={e => setConfig({...config, educationYear: e.target.value})} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Music /> เพลงประกอบ (Playlist)</h2>
-                        <div className="space-y-2 mb-4">
-                            {config.bgmPlaylist.map((url, i) => (
-                                <div key={i} className="flex gap-2">
-                                    <input className="flex-1 bg-slate-900 border border-slate-600 p-2 rounded-lg text-xs" value={url} readOnly />
-                                    <button onClick={() => setConfig({...config, bgmPlaylist: config.bgmPlaylist.filter((_, idx) => idx !== i)})} className="text-red-400"><Trash2 size={16}/></button>
-                                </div>
-                            ))}
-                        </div>
-                        <button onClick={handleAddMusic} className="w-full border border-dashed border-slate-500 text-slate-400 py-3 rounded-xl hover:bg-slate-700 hover:text-white transition">+ เพิ่มลิงก์เพลง</button>
-                    </div>
-
-                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ImageIcon /> พื้นหลังตามธีม (Custom Backgrounds)</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {['jungle', 'space', 'ocean', 'castle', 'candy', 'volcano'].map(theme => (
-                                <div key={theme}>
-                                    <label className="block text-xs uppercase text-slate-500 mb-1">{theme}</label>
-                                    <input 
-                                        placeholder={`ลิ้งค์รูปสำหรับ ${theme}`}
-                                        className="w-full bg-slate-900 border border-slate-600 p-2 rounded-lg text-sm"
-                                        value={config.themeBackgrounds[theme] || ''}
-                                        onChange={e => setConfig({
-                                            ...config, 
-                                            themeBackgrounds: { ...config.themeBackgrounds, [theme]: e.target.value }
-                                        })}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                        <button onClick={handleSaveConfig} className="flex-1 bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2"><Save /> บันทึกการตั้งค่าทั้งหมด</button>
-                        <button onClick={() => { if(confirm('ล้างข้อมูลทั้งหมด?')) StorageService.resetFactory(); }} className="px-6 bg-red-600 hover:bg-red-500 rounded-2xl font-bold shadow-lg">Reset</button>
-                    </div>
-                </div>
-            )}
-
-            {/* --- TAB: สรุปคะแนน --- */}
-            {activeTab === 'SUMMARY' && (
-                <div className="max-w-5xl mx-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* ฝั่งซ้าย: คะแนนรวมรายคน */}
-                        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                             <h2 className="text-xl font-bold mb-6 text-blue-400 flex items-center gap-2"><Trophy /> อันดับคะแนนรวม</h2>
-                             <div className="space-y-4">
-                                 {students.sort((a,b) => (b.score || 0) - (a.score || 0)).map((s, i) => (
-                                     <div key={s.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-xl border border-slate-700">
-                                         <div className="flex items-center gap-3">
-                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${i===0?'bg-yellow-500 text-black':i===1?'bg-slate-400 text-black':i===2?'bg-orange-700 text-white':'bg-slate-800 text-slate-500'}`}>{i+1}</div>
-                                             <div>
-                                                 <div className="font-bold">{s.firstName}</div>
-                                                 <div className="text-xs text-slate-500">ห้อง {s.classroom}</div>
-                                             </div>
-                                         </div>
-                                         <div className="text-2xl font-black text-yellow-500">{s.score || 0}</div>
+                        <ChevronRight size={16} />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+               <div className="md:col-span-2 bg-slate-900/50 rounded-xl border border-slate-700 p-6 h-[600px] overflow-y-auto relative">
+                  {selectedStudent ? (
+                    <div>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 border-b border-slate-700 pb-4">
+                         <h2 className="text-2xl font-bold flex items-center gap-2 text-blue-400"><CheckCircle2/> ผลการเรียน: {selectedStudent.firstName}</h2>
+                         <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+                            <button onClick={() => setReportMode('CLASSROOM')} className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition ${reportMode==='CLASSROOM' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500'}`}><Star size={16}/> หรรษา</button>
+                            <button onClick={() => setReportMode('FREEPLAY')} className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition ${reportMode==='FREEPLAY' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-500'}`}><Gamepad2 size={16}/> ตามใจ</button>
+                         </div>
+                      </div>
+                      <div className="space-y-6">
+                        {selectedStudent.sessions && selectedStudent.sessions.filter(s => s.mode === reportMode).length > 0 ? (
+                          selectedStudent.sessions.filter(s => s.mode === reportMode).slice().reverse().map((sess, idx) => (
+                            <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden shadow-lg hover:border-blue-500/30 transition">
+                               <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700">
+                                  <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
+                                     <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
+                                     <span className="flex items-center gap-1.5"><Clock size={16}/> {new Date(sess.timestamp).toLocaleTimeString('th-TH')}</span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                     <div className="text-right flex flex-col items-end gap-1">
+                                        <div className="flex flex-wrap justify-end gap-2 text-[10px] md:text-[11px] font-bold">
+                                           <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">คะแนนจริง {sess.realScore || 0}</span>
+                                           <span className="text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">คะแนนสมบัติ {sess.bonusScore || 0}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                           <div className="text-3xl font-black text-white drop-shadow-md leading-none">{sess.score}</div>
+                                           <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">ผลรวมครั้งนี้</div>
+                                        </div>
                                      </div>
-                                 ))}
-                             </div>
-                        </div>
-
-                        {/* ฝั่งขวา: แยกตามโหมด */}
-                        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                            <h2 className="text-xl font-bold mb-6 text-green-400 flex items-center gap-2"><BarChart /> สถิติการเล่น</h2>
-                            <div className="h-64 flex items-center justify-center text-slate-500 italic">
-                                (ส่วนนี้จะแสดงกราฟหรือรายละเอียดแยกโหมดในอนาคต)
+                                     <button onClick={() => { if(confirm('ลบประวัตินี้?')) { StorageService.deleteSession(selectedStudent.id, sess.sessionId); refreshData(); } }} className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"><Trash2 size={20}/></button>
+                                  </div>
+                               </div>
+                               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30">
+                                  {sess.details?.map((d, dIdx) => (
+                                    <div key={dIdx} className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center shadow-inner">
+                                       <span className="text-base font-bold font-mono text-slate-200">{d.questionText}</span>
+                                       <div className="flex items-center gap-2">
+                                          {d.isCorrect ? <CheckCircle2 size={18} className="text-green-400"/> : <XCircle size={18} className="text-red-400"/>}
+                                          <span className="text-[10px] text-slate-500">+{d.scoreEarned}</span>
+                                       </div>
+                                    </div>
+                                  ))}
+                               </div>
                             </div>
-                        </div>
+                          ))
+                        ) : ( <div className="text-center py-20 text-slate-600 italic">ยังไม่มีประวัติการเล่นในโหมดนี้</div> )}
+                      </div>
                     </div>
-                </div>
-            )}
-
-        </div>
-      </div>
+                  ) : ( <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4"><Users size={60} className="opacity-10"/> เลือกนักเรียนทางซ้ายเพื่อดูผลการเรียน</div> )}
+               </div>
+           </div>
+       )}
+       </div>
     </div>
   );
 };
