@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-// [แก้ไข] เติม type หน้าปีกกา
+// [แก้ไข] เพิ่ม type ที่จำเป็น
 import type { UserRole, StudentProfile } from '../types';
 import { StorageService } from '../services/storage';
-// [แก้ไข] ลบ Minus และ X ออก
+// [แก้ไข] ลบ Minus, X ที่ไม่ได้ใช้ออก
 import { User, Star, GraduationCap, Plus, Divide, Calculator, Infinity, Pi, Sigma } from 'lucide-react';
 
 interface Props {
-  onLogin: (role: UserRole, id: string, guestNickname?: string) => void;
+  // [แก้ไข] เพิ่ม guestAvatar? เพื่อส่งรูปออกไป
+  onLogin: (role: UserRole, id: string, guestNickname?: string, guestAvatar?: string) => void;
 }
 
 export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
@@ -70,7 +71,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 <button 
                     onClick={() => { 
                         if (studentId === '00') {
-                            onLogin('STUDENT', '00', 'ผู้มาเยือน');
+                            // [แก้ไข] ส่ง guestAvatar ไปด้วย (แก้แค่ตรงนี้)
+                            onLogin('STUDENT', '00', 'ผู้มาเยือน', guestAvatar);
                         } else if (foundStudent) {
                             onLogin('STUDENT', studentId); 
                         } else {

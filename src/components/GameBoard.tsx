@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-// [แก้ไข] ลบ QuestionLog ออก
-import type { PlayerState, TileType, MathQuestion, ThemeConfig, TileConfig, QuestionDetail, ScoringMode } from '../types'; 
+import type { PlayerState, TileType, MathQuestion, ThemeConfig, TileConfig, QuestionDetail, ScoringMode, CharacterType } from '../types'; 
 import { StorageService } from '../services/storage'; 
 import { CharacterSvg } from './CharacterSvg';
 import { MathModal } from './MathModal';
-// [แก้ไข] ลบ Volume2 ออก
-import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, VolumeX, PlayCircle } from 'lucide-react';
+// [แก้ไข 1] ลบ VolumeX, Volume2 และ import ที่ไม่ได้ใช้ออก
+import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, PlayCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
+
+// [แก้ไข 2] ลบ import constants ที่ไม่ได้ใช้ออกทั้งหมด
 
 interface Props {
   players: PlayerState[];
@@ -21,9 +22,9 @@ interface Props {
 }
 
 const SFX = {
-  WIN: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3',
-  TREASURE: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
-  STEP: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'
+  WIN: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'),
+  TREASURE: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),
+  STEP: new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3')
 };
 
 const THEME_ASSETS: any = {
@@ -38,14 +39,13 @@ const THEME_ASSETS: any = {
 };
 
 export const GameBoard: React.FC<Props> = ({ 
+  // [แก้ไข 3] ลบ questions ออกจากการรับค่า (เพราะไม่ได้ใช้ในฟังก์ชันนี้)
   players, currentPlayerIndex, theme, gameMode,
-  // [แก้ไข] ลบ questions ออกจากตรงนี้ เพราะไม่ได้ใช้ (ใช้ gameQuestions จาก state แทน)
   onTurnComplete, onQuestionAnswered, onGameEnd, onExit 
 }) => {
   const currentThemeKey = (theme?.id || theme?.bgClass || 'default').toLowerCase().split(' ')[0];
   const defaultAssets = THEME_ASSETS[Object.keys(THEME_ASSETS).find(k => currentThemeKey.includes(k)) || 'default'];
 
-  // [แก้ไข] ลบ index ออกจาก parameter เพราะไม่ได้ใช้
   const getThemeColors = (type: TileType) => {
       if (type === 'TREASURE') return 'bg-yellow-400 border-yellow-600 text-yellow-900 animate-pulse-slow';
       if (type === 'TRAP') return 'bg-black border-slate-700 text-white animate-pulse-slow';
@@ -68,12 +68,14 @@ export const GameBoard: React.FC<Props> = ({
   
   const [bgmVolume, setBgmVolume] = useState(0.8);
   const [sfxVolume, setSfxVolume] = useState(0.4);
+  
   const [showSettings, setShowSettings] = useState(false);
   const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [activeAssets, setActiveAssets] = useState<{ bg: string | null, bgmPlaylist: string[] }>({ bg: null, bgmPlaylist: [] });
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  // [แก้ไข 4] ลบ state isMuted ออก
   const [audioError, setAudioError] = useState(false);
   const [isVideoBg, setIsVideoBg] = useState(false);
 
@@ -86,7 +88,6 @@ export const GameBoard: React.FC<Props> = ({
     const saved = localStorage.getItem('math_game_session_index');
     return saved ? parseInt(saved) : currentPlayerIndex;
   });
-
   const [tiles, setTiles] = useState<TileConfig[]>([]);
   const [activeQuestion, setActiveQuestion] = useState<MathQuestion | null>(null);
   const [isMoving, setIsMoving] = useState(false);
@@ -102,8 +103,10 @@ export const GameBoard: React.FC<Props> = ({
   const playersRef = useRef(localPlayers);
 
   useEffect(() => { if (gameMode === 'CLASSROOM') { const daily = StorageService.getDailyQuestions(); setGameQuestions((daily && daily.length > 0) ? daily : [{id:'def', question:'1+1', answer:2, options:[1,2,3,4]}]); } else { const pool = StorageService.getFreeplayQuestions(); if (pool.length > 0) { const shuffled = [...pool].sort(() => 0.5 - Math.random()); setGameQuestions(shuffled.slice(0, 10)); } else { setGameQuestions([{id:'free', question:'2+2', answer:4, options:[3,4,5,6]}]); } } const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { setCurrentSongIndex(0); } }, [theme, currentThemeKey, defaultAssets, gameMode]);
+  
   useEffect(() => { if (hasInteracted && activeAssets.bgmPlaylist.length > 0 && audioRef.current) { const rawLink = activeAssets.bgmPlaylist[currentSongIndex]; const directLink = getDirectAudioLink(rawLink); if (audioRef.current.src !== directLink) { audioRef.current.src = directLink; audioRef.current.load(); const playPromise = audioRef.current.play(); if (playPromise !== undefined) { playPromise.then(() => { setIsPlaying(true); setAudioError(false); }).catch(error => { console.log("Auto-play prevented", error); setIsPlaying(false); setAudioError(true); }); } } } }, [currentSongIndex, activeAssets.bgmPlaylist, hasInteracted]);
   useEffect(() => { if (audioRef.current) { if (isPlaying) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else { audioRef.current.pause(); } } }, [isPlaying]);
+  // [แก้ไข 5] ลบ logic isMuted ออก เหลือแค่ volume ปกติ
   useEffect(() => { if (audioRef.current) audioRef.current.volume = bgmVolume; }, [bgmVolume]);
 
   const handleUserInteract = () => { setHasInteracted(true); setIsPlaying(true); };
@@ -112,18 +115,31 @@ export const GameBoard: React.FC<Props> = ({
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
   useEffect(() => { const generateCurvedPath = (count: number) => { const points = []; const rows = 5; const cols = Math.ceil(count / rows); for (let i = 0; i < count; i++) { const row = Math.floor(i / cols); const col = i % cols; const isReverseRow = row % 2 !== 0; let x = isReverseRow ? 88 - (col * (76 / (cols - 1))) : 12 + (col * (76 / (cols - 1))); let y = 82 - (row * (68 / (rows - 1))); y += Math.sin(col * 0.5) * 2 + (Math.random() - 0.5) * 2; points.push({ x, y }); } return points; }; const pathCoords = generateCurvedPath(40); let middleTypes: TileType[] = Array(38).fill('NORMAL'); const qIndices = (() => { const arr = Array.from({length: 38}, (_, i) => i + 1); const selected: number[] = []; while(selected.length < 10 && arr.length > 0) { const idx = Math.floor(Math.random() * arr.length); selected.push(arr[idx]); arr.splice(idx, 1); } return selected; })(); const tIndices = (() => { const arr = Array.from({length: 38}, (_, i) => i + 1).filter(i => !qIndices.includes(i)); const selected: number[] = []; while(selected.length < 6 && arr.length > 0) { const idx = Math.floor(Math.random() * arr.length); selected.push(arr[idx]); arr.splice(idx, 1); } return selected; })(); const trapIndices = (() => { const arr = Array.from({length: 38}, (_, i) => i + 1).filter(i => !qIndices.includes(i) && !tIndices.includes(i)); const selected: number[] = []; while(selected.length < 4 && arr.length > 0) { const idx = Math.floor(Math.random() * arr.length); selected.push(arr[idx]); arr.splice(idx, 1); } return selected; })(); qIndices.forEach(idx => middleTypes[idx - 1] = 'QUESTION'); tIndices.forEach(idx => middleTypes[idx - 1] = 'TREASURE'); trapIndices.forEach(idx => middleTypes[idx - 1] = 'TRAP'); const finalTypes = ['START', ...middleTypes, 'FINISH']; setTiles(pathCoords.map((coord, i) => ({ x: coord.x, y: coord.y, type: finalTypes[i] as TileType }))); }, []);
+  
   useEffect(() => { localStorage.setItem('math_game_session_players', JSON.stringify(localPlayers)); localStorage.setItem('math_game_session_index', localCurrentIndex.toString()); }, [localPlayers, localCurrentIndex]);
   useEffect(() => { playersRef.current = localPlayers; }, [localPlayers]);
-  const playSfx = (url: string) => { const audio = new Audio(url); audio.volume = sfxVolume; audio.play().catch(()=>{}); };
+  
+  // [แก้ไข 6] ลบเงื่อนไข !isMuted ออก เล่นเสียงได้เลย
+  const playSfx = (audio: HTMLAudioElement) => { 
+      audio.currentTime = 0; 
+      audio.volume = sfxVolume; 
+      audio.play().catch(()=>{}); 
+  };
 
   const handleAction = () => { if (gameFinished || isSpinning || isMoving || activeQuestion || activeOverlay) return; if (pendingSteps > 0) { resumeMove(); return; } setIsSpinning(true); spinIntervalRef.current = setInterval(() => setDisplayNumber(Math.floor(Math.random() * 6) + 1), 50); setTimeout(() => { if(spinIntervalRef.current) clearInterval(spinIntervalRef.current); const result = Math.floor(Math.random() * 6) + 1; setDisplayNumber(result); setIsSpinning(false); setTimeout(() => startMove(result), 800); }, 1500); };
   const startMove = (steps: number) => moveOneStep(steps, playersRef.current[localCurrentIndex].position);
   const moveOneStep = (stepsRemaining: number, currentPos: number) => { if (stepsRemaining <= 0) { setIsMoving(false); const tile = tiles[currentPos]; if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); else if (tile?.type === 'QUESTION' && pendingSteps === 0) handleTileEvent('QUESTION'); else endTurn(); return; } setIsMoving(true); playSfx(SFX.STEP); const nextPos = Math.min(currentPos + 1, tiles.length - 1); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; setLocalPlayers(newPlayers); onTurnComplete(newPlayers, localCurrentIndex); setTimeout(() => { const tile = tiles[nextPos]; if (tile?.type === 'FINISH') { setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; } if (tile?.type === 'QUESTION') { setIsMoving(false); setPendingSteps(stepsRemaining - 1); handleTileEvent('QUESTION'); return; } if (tile?.type === 'TRAP' && stepsRemaining === 1) { setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; } moveOneStep(stepsRemaining - 1, nextPos); }, 500); };
   
-  // [แก้ไข] ลบ pos ออกจาก parameter เพราะไม่ได้ใช้
   const handleTileEvent = (type: TileType) => { 
       if (type === 'QUESTION') setActiveQuestion(gameQuestions[Math.floor(Math.random() * gameQuestions.length)]); 
-      else if (type === 'TREASURE') { playSfx(SFX.TREASURE); setActiveOverlay({ type: 'TREASURE', msg: 'เจอสมบัติ! +10 คะแนน' }); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex].score += 10; setLocalPlayers(newPlayers); } 
+      else if (type === 'TREASURE') { 
+          playSfx(SFX.TREASURE); 
+          const bonus = 10; 
+          setActiveOverlay({ type: 'TREASURE', msg: `เจอสมบัติ! +${bonus} คะแนน` }); 
+          const newPlayers = [...playersRef.current]; 
+          newPlayers[localCurrentIndex].score += bonus; 
+          setLocalPlayers(newPlayers); 
+      } 
       else if (type === 'TRAP') { const back = Math.floor(Math.random() * 3) + 1; setTrapBackSteps(back); setActiveOverlay({ type: 'TRAP', msg: `โดนกับดัก! ถอยหลัง ${back} ช่อง` }); } 
   };
   
@@ -131,33 +147,22 @@ export const GameBoard: React.FC<Props> = ({
   const endTurn = () => { const nextIndex = (localCurrentIndex + 1) % localPlayers.length; setLocalCurrentIndex(nextIndex); setDisplayNumber(1); };
   
   const handleAnswer = (correct: boolean, usedCalculator: boolean) => { 
-    if (activeQuestion) { 
-        const score = correct ? (usedCalculator ? 5 : 10) : 0; 
-        onQuestionAnswered({ 
-            questionText: activeQuestion.question, 
-            isCorrect: correct, 
-            scoreEarned: score 
-        }); 
-        if (correct) { 
-            const newPlayers = [...playersRef.current]; 
-            newPlayers[localCurrentIndex].score += score; 
-            if (usedCalculator && newPlayers[localCurrentIndex].calculatorUsesLeft > 0) {
-                newPlayers[localCurrentIndex].calculatorUsesLeft -= 1;
-            }
-            setLocalPlayers(newPlayers); 
-        } 
-    } 
-    resumeMove(); 
-  };
-  
-  const handleConsumeCalculator = () => { 
-      const newPlayers = [...playersRef.current]; 
-      if (newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { 
-          newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; 
-          setLocalPlayers(newPlayers); 
+      if (activeQuestion) { 
+          const fullScore = 10;
+          const score = correct ? (usedCalculator ? fullScore / 2 : fullScore) : 0; 
+          onQuestionAnswered({ questionText: activeQuestion.question, isCorrect: correct, scoreEarned: score }); 
+          if (correct) { 
+              const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex].score += score; 
+              if (usedCalculator && newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; }
+              setLocalPlayers(newPlayers); 
+          } 
       } 
+      resumeMove(); 
   };
   
+  const handleConsumeCalculator = () => { const newPlayers = [...playersRef.current]; if (newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; setLocalPlayers(newPlayers); } };
+  
+
   const generateSvgPath = (coords: {x:number, y:number}[]) => { if (coords.length === 0) return ""; let d = `M ${coords[0].x} ${coords[0].y}`; for (let i = 0; i < coords.length - 1; i++) { const next = coords[i+1]; d += ` L ${next.x} ${next.y}`; } return d; };
   const pathD = generateSvgPath(tiles);
   const currentPlayer = localPlayers[localCurrentIndex];
@@ -167,7 +172,7 @@ export const GameBoard: React.FC<Props> = ({
       
       {!hasInteracted && (<div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in"><div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg mx-4"><h1 className="text-3xl md:text-4xl font-black text-white mb-6">พร้อมผจญภัยหรือยัง?</h1><button onClick={handleUserInteract} className="bg-green-600 hover:bg-green-500 text-white text-xl md:text-2xl font-bold px-8 py-4 md:px-12 md:py-6 rounded-full shadow-lg flex items-center gap-3 mx-auto animate-bounce hover:scale-110 transition"><PlayCircle size={32} /> เริ่มเกมเลย!</button><p className="text-slate-400 mt-6 text-xs md:text-sm">(แตะเพื่อเปิดเสียง)</p></div></div>)}
       <audio ref={audioRef} onEnded={handleNextSong} crossOrigin="anonymous" className="hidden" />
-      {audioError && hasInteracted && (<div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce"><button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base"><VolumeX className="animate-pulse" size={16}/> เล่นเพลง</button></div>)}
+      {audioError && hasInteracted && (<div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce"><button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base"><Music className="animate-pulse" size={16}/> เล่นเพลง</button></div>)}
 
       {/* Controls */}
       <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
@@ -180,10 +185,12 @@ export const GameBoard: React.FC<Props> = ({
       <div className="relative w-full h-[80%] md:w-[80%] md:h-full z-10 order-1 md:order-1 overflow-hidden flex items-center justify-center bg-slate-900">
           <div className="absolute inset-0 z-0">
               {activeAssets.bg ? (isVideoBg ? (<video src={activeAssets.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />) : (<img src={activeAssets.bg} alt="Background" className="w-full h-full object-cover z-0" referrerPolicy="no-referrer" />)) : (<div className="w-full h-full" style={{ background: getGradientStyle() }} />)}
-              {/* Overlay with 50% opacity */}
               <div className="absolute inset-0 bg-black/50 z-0"></div>
           </div>
-          <button onClick={() => { localStorage.removeItem('math_game_session_players'); localStorage.removeItem('math_game_session_index'); onExit(); }} className="absolute top-4 left-4 z-50 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
+          {/* [แก้ไข 7] ลบปุ่ม Mute ออก เหลือแต่ปุ่ม LogOut */}
+          <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+              <button onClick={() => { localStorage.removeItem('math_game_session_players'); localStorage.removeItem('math_game_session_index'); onExit(); }} className="bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
+          </div>
           <div className="relative w-full h-full max-w-[100vh] max-h-[75vw] md:max-w-[calc(80vw-2rem)] md:max-h-[calc(100vh-2rem)] aspect-[4/3] shadow-2xl rounded-3xl overflow-hidden border-4 border-slate-700/50 backdrop-blur-sm m-4">
                 <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none"><path d={pathD} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1, 3" /><path d={pathD} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 {tiles.map((t, i) => {
@@ -191,25 +198,45 @@ export const GameBoard: React.FC<Props> = ({
                     const tileStyle = getThemeColors(t.type); 
                     return (<div key={i} className={`absolute ${sizeClass} aspect-square -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-2xl border-[3px] md:border-4 shadow-[0_4px_0_rgba(0,0,0,0.2)] transition-transform z-10 ${i === currentPlayer?.position ? 'scale-110 ring-4 ring-yellow-300 z-20' : 'scale-100'} ${tileStyle}`} style={{ left: `${t.x}%`, top: `${t.y}%` }}><span className={`font-black ${isSpecial || isStartFinish ? 'text-sm md:text-xl' : 'text-[0.6rem] md:text-[0.7rem] opacity-60'}`}>{t.type === 'START' && 'START'} {t.type === 'FINISH' && 'FINISH'} {t.type === 'QUESTION' && '?'} {t.type === 'TREASURE' && '💎'} {t.type === 'TRAP' && '🕸️'} {!isSpecial && !isStartFinish && i}</span></div>);
                 })}
-                {localPlayers.map((p, i) => { const tile = tiles[Math.min(p.position, tiles.length-1)]; if (!tile) return null; return (<div key={i} className={`absolute w-[7%] md:w-[5%] aspect-square -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out drop-shadow-2xl ${isMoving && localCurrentIndex === i ? 'animate-hop' : ''}`} style={{ left: `${tile.x}%`, top: `${tile.y - 5}%` }}>{p.profileImage ? (<img src={p.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-lg object-cover" referrerPolicy="no-referrer" />) : (<CharacterSvg appearance={p.appearance} theme={currentThemeKey} className="w-full h-full filter drop-shadow-lg" />)}</div>); })}
+                {localPlayers.map((p, i) => { 
+                    const tile = tiles[Math.min(p.position, tiles.length-1)]; 
+                    if (!tile) return null; 
+                    return (
+                        <div key={i} className={`absolute w-[7%] md:w-[5%] aspect-square -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out drop-shadow-2xl ${isMoving && localCurrentIndex === i ? 'animate-hop' : ''}`} style={{ left: `${tile.x}%`, top: `${tile.y - 5}%` }}>
+                            {p.profileImage ? (
+                                <img src={p.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-lg object-cover" referrerPolicy="no-referrer" alt="Player" />
+                            ) : (
+                                <CharacterSvg 
+                                    // Cast type เพื่อแก้ error
+                                    type={(p.appearance?.base === 'BOY' ? theme.player1Char : theme.player2Char) as CharacterType} 
+                                    className="w-full h-full filter drop-shadow-lg" 
+                                    appearance={p.appearance}
+                                />
+                            )}
+                        </div>
+                    ); 
+                })}
           </div>
       </div>
 
       <div className="relative w-full h-[20%] md:w-[20%] md:h-full z-20 order-2 md:order-2 bg-slate-900/95 border-t-4 md:border-t-0 md:border-l-4 border-slate-700 backdrop-blur-md flex flex-row md:flex-col items-center justify-between p-3 md:p-6 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-           <div className="flex flex-row md:flex-col items-center gap-3 w-[50%] md:w-full"><div className="relative w-14 h-14 md:w-32 md:h-32 hover:scale-110 transition-transform"><div className="absolute inset-0 bg-white/10 rounded-full blur-xl animate-pulse"></div>{currentPlayer?.profileImage ? (<img src={currentPlayer.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-2xl relative z-10 object-cover" referrerPolicy="no-referrer" />) : (<CharacterSvg appearance={currentPlayer?.appearance} theme={currentThemeKey} className="w-full h-full drop-shadow-2xl relative z-10" />)}</div><div className="text-left md:text-center overflow-hidden min-w-0"><h1 className="text-sm md:text-2xl font-black text-white truncate">{currentPlayer?.nickname || currentPlayer?.firstName}</h1><div className="hidden md:block bg-slate-800/80 w-full p-3 rounded-xl border border-slate-600 mt-3"><div className="text-xs text-slate-400 uppercase">คะแนนสะสม</div><div className="text-5xl font-black text-yellow-400">{currentPlayer?.score}</div></div><div className="md:hidden text-yellow-400 font-black text-sm">⭐ {currentPlayer?.score} คะแนน</div></div></div>
+           <div className="flex flex-row md:flex-col items-center gap-3 w-[50%] md:w-full">
+               <div className="relative w-14 h-14 md:w-32 md:h-32 hover:scale-110 transition-transform">
+                   <div className="absolute inset-0 bg-white/10 rounded-full blur-xl animate-pulse"></div>
+                   {currentPlayer?.profileImage ? (
+                       <img src={currentPlayer.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-2xl relative z-10 object-cover" referrerPolicy="no-referrer" alt="Current Player" />
+                   ) : (
+                       <CharacterSvg appearance={currentPlayer?.appearance} theme={currentThemeKey} className="w-full h-full drop-shadow-2xl relative z-10" />
+                   )}
+               </div>
+               <div className="text-left md:text-center overflow-hidden min-w-0"><h1 className="text-sm md:text-2xl font-black text-white truncate">{currentPlayer?.nickname || currentPlayer?.firstName}</h1><div className="hidden md:block bg-slate-800/80 w-full p-3 rounded-xl border border-slate-600 mt-3"><div className="text-xs text-slate-400 uppercase">คะแนนสะสม</div><div className="text-5xl font-black text-yellow-400">{currentPlayer?.score}</div></div><div className="md:hidden text-yellow-400 font-black text-sm">⭐ {currentPlayer?.score} คะแนน</div></div>
+           </div>
            <div className="w-[50%] md:w-full flex justify-end md:justify-center pl-2"><div className="bg-black/20 p-2 md:p-4 rounded-xl md:rounded-3xl border-2 md:border-4 border-slate-600 shadow-xl group flex flex-row md:flex-col items-center gap-2 md:gap-4 w-full"><div className="bg-slate-800 w-12 h-10 md:w-full md:h-24 rounded-lg md:rounded-xl flex items-center justify-center border-2 border-slate-600 relative shrink-0"><span className={`text-2xl md:text-6xl font-black font-mono relative z-10 ${isSpinning ? 'text-white blur-[1px]' : 'text-green-400'}`}>{displayNumber}</span></div><button onClick={(e) => { e.stopPropagation(); handleAction(); }} className={`flex-1 py-2 md:py-4 rounded-lg md:rounded-xl text-white font-black text-sm md:text-xl shadow-lg active:scale-95 transition-all ${pendingSteps > 0 ? 'bg-orange-500 animate-pulse' : 'bg-blue-600 hover:bg-blue-500'} whitespace-nowrap`}>{pendingSteps > 0 ? `เดิน (${pendingSteps})` : isSpinning ? '...' : 'สุ่มตัวเลข'}</button></div></div>
       </div>
 
-      <MathModal 
-        question={activeQuestion} 
-        onAnswer={handleAnswer} 
-        volume={sfxVolume} 
-        calculatorUsesLeft={currentPlayer?.calculatorUsesLeft || 0} 
-        onConsumeCalculator={handleConsumeCalculator} 
-      />
+      <MathModal question={activeQuestion} onAnswer={handleAnswer} volume={sfxVolume} calculatorUsesLeft={currentPlayer?.calculatorUsesLeft || 0} onConsumeCalculator={handleConsumeCalculator} />
       {activeOverlay && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-pop-in" onClick={() => !isMoving && activeOverlay.type !== 'WIN' && resumeMove()}><div className="bg-slate-800 p-8 rounded-3xl border-4 border-white text-center shadow-2xl max-w-sm"><div className="text-7xl mb-4 animate-bounce">{activeOverlay.type === 'TREASURE' ? '💎' : '🕸️'}</div><h2 className="text-2xl font-black text-white mb-2">{activeOverlay.msg}</h2></div></div>)}
       
-      {/* Game Finished Modal */}
       {gameFinished && (
          <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 animate-pop-in">
              <div className="text-center p-6 bg-slate-800/90 rounded-2xl border-4 border-yellow-500 shadow-2xl backdrop-blur-md max-w-sm w-full mx-4 relative">
@@ -221,7 +248,7 @@ export const GameBoard: React.FC<Props> = ({
                     <div className="text-slate-400 text-xs uppercase tracking-widest mb-1">คะแนนรวมรอบนี้</div>
                     <div className="text-5xl font-black text-yellow-400 drop-shadow-glow">{currentPlayer?.score}</div>
                 </div>
-                <button onClick={() => { localStorage.removeItem('math_game_session_players'); onGameEnd(); }} className="bg-green-600 hover:bg-green-500 w-full py-3 rounded-xl text-lg font-bold text-white shadow-lg transition flex items-center justify-center gap-2"><Home size={20} /> กลับหน้าหลัก</button>
+                <button onClick={() => { localStorage.removeItem('math_game_session_players'); onGameEnd(); }} className="bg-green-600 w-full py-3 rounded-xl text-lg font-bold text-white shadow-lg transition flex items-center justify-center gap-2"><Home size={20} /> กลับหน้าหลัก</button>
              </div>
          </div>
       )}
