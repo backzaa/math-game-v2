@@ -25,7 +25,6 @@ export function App() {
   const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'MODE_SELECT' | 'THEME_SELECT' | 'GAME' | 'DASHBOARD'>('LOADING');
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState<string>('');
-  
   const [currentGuestAvatar, setCurrentGuestAvatar] = useState<string>('');
 
   const [gameMode, setGameMode] = useState<ScoringMode>('CLASSROOM');
@@ -108,19 +107,12 @@ export function App() {
     }
   };
 
-  // [แก้ไข] เพิ่มการสุ่มสีพื้นหลัง Gradient สวยๆ ให้รูปผู้มาเยือน
   const emojiToDataUrl = (emoji: string) => {
-    // ชุดสี Gradient สดใส (Pastel & Vivid)
     const gradients = [
-        ['#ff9a9e', '#fecfef'], // ชมพูหวาน
-        ['#a18cd1', '#fbc2eb'], // ม่วงพาสเทล
-        ['#84fab0', '#8fd3f4'], // เขียวฟ้าสดใส
-        ['#fccb90', '#d57eeb'], // ส้มม่วง
-        ['#e0c3fc', '#8ec5fc'], // ม่วงฟ้า
-        ['#ffecd2', '#fcb69f'], // ส้มพีช
-        ['#ff9a9e', '#fecfef'], // แดงชมพู
+        ['#ff9a9e', '#fecfef'], ['#a18cd1', '#fbc2eb'], ['#84fab0', '#8fd3f4'],
+        ['#fccb90', '#d57eeb'], ['#e0c3fc', '#8ec5fc'], ['#ffecd2', '#fcb69f'],
+        ['#ff9a9e', '#fecfef'], 
     ];
-    // สุ่มสีจาก Emoji เพื่อให้ได้สีเดิมเสมอสำหรับ Emoji ตัวเดิม (ใช้ charCodeAt)
     const colorIndex = emoji.charCodeAt(0) % gradients.length;
     const [c1, c2] = gradients[colorIndex];
 
@@ -136,7 +128,6 @@ export function App() {
         <text x="50%" y="55%" font-size="70" text-anchor="middle" dominant-baseline="central">${emoji}</text>
       </svg>
     `.trim();
-    
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
@@ -155,7 +146,7 @@ export function App() {
               <div className="bg-blue-400 p-4 rounded-full shadow-lg border-4 border-white animate-bounce" style={{ animationDelay: '0.2s' }}><Backpack className="text-white w-10 h-10" /></div>
               <div className="bg-pink-400 p-4 rounded-full shadow-lg border-4 border-white animate-bounce" style={{ animationDelay: '0.4s' }}><BookOpen className="text-white w-10 h-10" /></div>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2 py-2 text-center leading-relaxed">รอโหลดสักครู่นะครับ</h2>
+          <h2 className="text-3xl font-bold text-white mb-2 py-2 text-center leading-relaxed">รอโหลดสักครู่นะครับ</h2>
           <div className={`flex items-center gap-2 font-bold mb-8 h-8 text-sm px-5 py-1 rounded-full border border-white/20 transition-all duration-500 ${loadProgress === 100 ? 'bg-green-500 text-white' : 'bg-indigo-900/30 text-indigo-50'}`}>
             {loadProgress === 100 ? <CheckCircle2 size={16}/> : <CloudSync size={16} className="animate-spin" />} 
             {loadStatus}
@@ -170,7 +161,7 @@ export function App() {
   }
 
   return (
-    <div className="h-full w-full bg-slate-900 overflow-hidden flex flex-col">
+    <div className="h-full w-full bg-slate-900 overflow-hidden flex flex-col font-sans" style={{ fontFamily: "'Mali', cursive" }}>
       {screen === 'LOGIN' && <LoginScreen onLogin={handleLogin} />}
       {screen === 'DASHBOARD' && <TeacherDashboard onLogout={() => setScreen('LOGIN')} />}
       
@@ -237,7 +228,10 @@ export function App() {
                                     appearance:{base:'BOY', skinColor:'#fcd34d'}, 
                                     sessions:[]
                                 }), 
-                                position:0, score:0, character:'BOY', calculatorUsesLeft:0, isFinished:false
+                                // [แก้ไขสำคัญ] ถ้าเลือกเล่นตามใจ (FREEPLAY) ให้ 2 ครั้ง, ถ้าห้องเรียน (CLASSROOM) ให้ 0 ครั้ง
+                                position:0, score:0, character:'BOY', 
+                                calculatorUsesLeft: gameMode === 'FREEPLAY' ? 2 : 0, 
+                                isFinished:false
                             }]); 
                             setSessionDetails([]);
                         }} 
