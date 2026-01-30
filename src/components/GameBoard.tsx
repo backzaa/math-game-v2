@@ -3,11 +3,8 @@ import type { PlayerState, TileType, MathQuestion, ThemeConfig, TileConfig, Ques
 import { StorageService } from '../services/storage'; 
 import { CharacterSvg } from './CharacterSvg';
 import { MathModal } from './MathModal';
-// [แก้ไข 1] ลบ VolumeX, Volume2 และ import ที่ไม่ได้ใช้ออก
 import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, PlayCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
-
-// [แก้ไข 2] ลบ import constants ที่ไม่ได้ใช้ออกทั้งหมด
 
 interface Props {
   players: PlayerState[];
@@ -22,9 +19,9 @@ interface Props {
 }
 
 const SFX = {
-  WIN: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'),
-  TREASURE: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),
-  STEP: new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3')
+  WIN: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3',
+  TREASURE: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  STEP: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'
 };
 
 const THEME_ASSETS: any = {
@@ -38,8 +35,12 @@ const THEME_ASSETS: any = {
     default: { bg: '', bgm: '' }
 };
 
+const GAME_CONFIG = {
+    pointsPerQuestion: 10,
+    pointsPerTreasure: 10
+};
+
 export const GameBoard: React.FC<Props> = ({ 
-  // [แก้ไข 3] ลบ questions ออกจากการรับค่า (เพราะไม่ได้ใช้ในฟังก์ชันนี้)
   players, currentPlayerIndex, theme, gameMode,
   onTurnComplete, onQuestionAnswered, onGameEnd, onExit 
 }) => {
@@ -68,14 +69,13 @@ export const GameBoard: React.FC<Props> = ({
   
   const [bgmVolume, setBgmVolume] = useState(0.8);
   const [sfxVolume, setSfxVolume] = useState(0.4);
-  
   const [showSettings, setShowSettings] = useState(false);
   const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [activeAssets, setActiveAssets] = useState<{ bg: string | null, bgmPlaylist: string[] }>({ bg: null, bgmPlaylist: [] });
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
-  // [แก้ไข 4] ลบ state isMuted ออก
+  
   const [audioError, setAudioError] = useState(false);
   const [isVideoBg, setIsVideoBg] = useState(false);
 
@@ -102,11 +102,20 @@ export const GameBoard: React.FC<Props> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playersRef = useRef(localPlayers);
 
-  useEffect(() => { if (gameMode === 'CLASSROOM') { const daily = StorageService.getDailyQuestions(); setGameQuestions((daily && daily.length > 0) ? daily : [{id:'def', question:'1+1', answer:2, options:[1,2,3,4]}]); } else { const pool = StorageService.getFreeplayQuestions(); if (pool.length > 0) { const shuffled = [...pool].sort(() => 0.5 - Math.random()); setGameQuestions(shuffled.slice(0, 10)); } else { setGameQuestions([{id:'free', question:'2+2', answer:4, options:[3,4,5,6]}]); } } const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { setCurrentSongIndex(0); } }, [theme, currentThemeKey, defaultAssets, gameMode]);
+  useEffect(() => { 
+      if (gameMode === 'CLASSROOM') { 
+          const daily = StorageService.getDailyQuestions(); 
+          setGameQuestions((daily && daily.length > 0) ? daily : [{id:'def', question:'1+1', answer:2, options:[1,2,3,4]}]); 
+      } else { 
+          const pool = StorageService.getFreeplayQuestions(); 
+          if (pool.length > 0) { const shuffled = [...pool].sort(() => 0.5 - Math.random()); setGameQuestions(shuffled.slice(0, 10)); } 
+          else { setGameQuestions([{id:'free', question:'2+2', answer:4, options:[3,4,5,6]}]); } 
+      } 
+      const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { setCurrentSongIndex(0); } 
+  }, [theme, currentThemeKey, defaultAssets, gameMode]);
   
   useEffect(() => { if (hasInteracted && activeAssets.bgmPlaylist.length > 0 && audioRef.current) { const rawLink = activeAssets.bgmPlaylist[currentSongIndex]; const directLink = getDirectAudioLink(rawLink); if (audioRef.current.src !== directLink) { audioRef.current.src = directLink; audioRef.current.load(); const playPromise = audioRef.current.play(); if (playPromise !== undefined) { playPromise.then(() => { setIsPlaying(true); setAudioError(false); }).catch(error => { console.log("Auto-play prevented", error); setIsPlaying(false); setAudioError(true); }); } } } }, [currentSongIndex, activeAssets.bgmPlaylist, hasInteracted]);
   useEffect(() => { if (audioRef.current) { if (isPlaying) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else { audioRef.current.pause(); } } }, [isPlaying]);
-  // [แก้ไข 5] ลบ logic isMuted ออก เหลือแค่ volume ปกติ
   useEffect(() => { if (audioRef.current) audioRef.current.volume = bgmVolume; }, [bgmVolume]);
 
   const handleUserInteract = () => { setHasInteracted(true); setIsPlaying(true); };
@@ -114,14 +123,66 @@ export const GameBoard: React.FC<Props> = ({
   const handleSelectSong = (index: number) => { setCurrentSongIndex(index); setIsPlaying(true); setShowMusicMenu(false); setAudioError(false); };
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
-  useEffect(() => { const generateCurvedPath = (count: number) => { const points = []; const rows = 5; const cols = Math.ceil(count / rows); for (let i = 0; i < count; i++) { const row = Math.floor(i / cols); const col = i % cols; const isReverseRow = row % 2 !== 0; let x = isReverseRow ? 88 - (col * (76 / (cols - 1))) : 12 + (col * (76 / (cols - 1))); let y = 82 - (row * (68 / (rows - 1))); y += Math.sin(col * 0.5) * 2 + (Math.random() - 0.5) * 2; points.push({ x, y }); } return points; }; const pathCoords = generateCurvedPath(40); let middleTypes: TileType[] = Array(38).fill('NORMAL'); const qIndices = (() => { const arr = Array.from({length: 38}, (_, i) => i + 1); const selected: number[] = []; while(selected.length < 10 && arr.length > 0) { const idx = Math.floor(Math.random() * arr.length); selected.push(arr[idx]); arr.splice(idx, 1); } return selected; })(); const tIndices = (() => { const arr = Array.from({length: 38}, (_, i) => i + 1).filter(i => !qIndices.includes(i)); const selected: number[] = []; while(selected.length < 6 && arr.length > 0) { const idx = Math.floor(Math.random() * arr.length); selected.push(arr[idx]); arr.splice(idx, 1); } return selected; })(); const trapIndices = (() => { const arr = Array.from({length: 38}, (_, i) => i + 1).filter(i => !qIndices.includes(i) && !tIndices.includes(i)); const selected: number[] = []; while(selected.length < 4 && arr.length > 0) { const idx = Math.floor(Math.random() * arr.length); selected.push(arr[idx]); arr.splice(idx, 1); } return selected; })(); qIndices.forEach(idx => middleTypes[idx - 1] = 'QUESTION'); tIndices.forEach(idx => middleTypes[idx - 1] = 'TREASURE'); trapIndices.forEach(idx => middleTypes[idx - 1] = 'TRAP'); const finalTypes = ['START', ...middleTypes, 'FINISH']; setTiles(pathCoords.map((coord, i) => ({ x: coord.x, y: coord.y, type: finalTypes[i] as TileType }))); }, []);
+  useEffect(() => { 
+      const generateCurvedPath = (count: number) => { 
+          const points = []; const rows = 5; const cols = Math.ceil(count / rows); 
+          for (let i = 0; i < count; i++) { 
+              const row = Math.floor(i / cols); const col = i % cols; const isReverseRow = row % 2 !== 0; 
+              let x = isReverseRow ? 88 - (col * (76 / (cols - 1))) : 12 + (col * (76 / (cols - 1))); 
+              let y = 82 - (row * (68 / (rows - 1))); 
+              y += Math.sin(col * 0.5) * 2 + (Math.random() - 0.5) * 2; 
+              points.push({ x, y }); 
+          } return points; 
+      }; 
+      const pathCoords = generateCurvedPath(40); 
+      
+      const getValidIndices = (count: number, minGap: number, occupied: number[]) => {
+          for(let attempt=0; attempt<500; attempt++) {
+              const selected: number[] = [];
+              const candidates = Array.from({length: 38}, (_, i) => i + 1).filter(i => !occupied.includes(i));
+              
+              for (let i = candidates.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+              }
+
+              for(const idx of candidates) {
+                  if (selected.length >= count) break;
+                  const isFarEnough = selected.every(s => Math.abs(s - idx) >= minGap);
+                  if (isFarEnough) selected.push(idx);
+              }
+
+              if (selected.length === count) return selected;
+          }
+          const fallback: number[] = [];
+          const pool = Array.from({length: 38}, (_, i) => i + 1).filter(i => !occupied.includes(i));
+          while(fallback.length < count && pool.length > 0) {
+              const idx = Math.floor(Math.random() * pool.length);
+              fallback.push(pool[idx]);
+              pool.splice(idx, 1);
+          }
+          return fallback;
+      };
+
+      const qIndices = getValidIndices(10, 3, []);
+      const tIndices = getValidIndices(4, 7, qIndices);
+      const trapIndices = getValidIndices(3, 10, [...qIndices, ...tIndices]);
+
+      const finalTypes: TileType[] = Array(40).fill('NORMAL');
+      finalTypes[0] = 'START';
+      finalTypes[39] = 'FINISH';
+      qIndices.forEach(idx => finalTypes[idx] = 'QUESTION');
+      tIndices.forEach(idx => finalTypes[idx] = 'TREASURE');
+      trapIndices.forEach(idx => finalTypes[idx] = 'TRAP');
+
+      setTiles(pathCoords.map((coord, i) => ({ x: coord.x, y: coord.y, type: finalTypes[i] }))); 
+  }, []);
   
   useEffect(() => { localStorage.setItem('math_game_session_players', JSON.stringify(localPlayers)); localStorage.setItem('math_game_session_index', localCurrentIndex.toString()); }, [localPlayers, localCurrentIndex]);
   useEffect(() => { playersRef.current = localPlayers; }, [localPlayers]);
   
-  // [แก้ไข 6] ลบเงื่อนไข !isMuted ออก เล่นเสียงได้เลย
-  const playSfx = (audio: HTMLAudioElement) => { 
-      audio.currentTime = 0; 
+  const playSfx = (url: string) => { 
+      const audio = new Audio(url); 
       audio.volume = sfxVolume; 
       audio.play().catch(()=>{}); 
   };
@@ -134,7 +195,7 @@ export const GameBoard: React.FC<Props> = ({
       if (type === 'QUESTION') setActiveQuestion(gameQuestions[Math.floor(Math.random() * gameQuestions.length)]); 
       else if (type === 'TREASURE') { 
           playSfx(SFX.TREASURE); 
-          const bonus = 10; 
+          const bonus = GAME_CONFIG.pointsPerTreasure; 
           setActiveOverlay({ type: 'TREASURE', msg: `เจอสมบัติ! +${bonus} คะแนน` }); 
           const newPlayers = [...playersRef.current]; 
           newPlayers[localCurrentIndex].score += bonus; 
@@ -148,7 +209,7 @@ export const GameBoard: React.FC<Props> = ({
   
   const handleAnswer = (correct: boolean, usedCalculator: boolean) => { 
       if (activeQuestion) { 
-          const fullScore = 10;
+          const fullScore = GAME_CONFIG.pointsPerQuestion;
           const score = correct ? (usedCalculator ? fullScore / 2 : fullScore) : 0; 
           onQuestionAnswered({ questionText: activeQuestion.question, isCorrect: correct, scoreEarned: score }); 
           if (correct) { 
@@ -168,7 +229,8 @@ export const GameBoard: React.FC<Props> = ({
   const currentPlayer = localPlayers[localCurrentIndex];
   
   return (
-    <div className="fixed inset-0 w-full h-full overflow-hidden flex flex-col md:flex-row font-sans bg-black">
+    // [แก้ไข] เปลี่ยน font-sans เป็น font-['Mali'] ตรงนี้ครับ
+    <div className="fixed inset-0 w-full h-full overflow-hidden flex flex-col md:flex-row font-['Mali'] bg-black">
       
       {!hasInteracted && (<div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in"><div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg mx-4"><h1 className="text-3xl md:text-4xl font-black text-white mb-6">พร้อมผจญภัยหรือยัง?</h1><button onClick={handleUserInteract} className="bg-green-600 hover:bg-green-500 text-white text-xl md:text-2xl font-bold px-8 py-4 md:px-12 md:py-6 rounded-full shadow-lg flex items-center gap-3 mx-auto animate-bounce hover:scale-110 transition"><PlayCircle size={32} /> เริ่มเกมเลย!</button><p className="text-slate-400 mt-6 text-xs md:text-sm">(แตะเพื่อเปิดเสียง)</p></div></div>)}
       <audio ref={audioRef} onEnded={handleNextSong} crossOrigin="anonymous" className="hidden" />
@@ -187,10 +249,8 @@ export const GameBoard: React.FC<Props> = ({
               {activeAssets.bg ? (isVideoBg ? (<video src={activeAssets.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />) : (<img src={activeAssets.bg} alt="Background" className="w-full h-full object-cover z-0" referrerPolicy="no-referrer" />)) : (<div className="w-full h-full" style={{ background: getGradientStyle() }} />)}
               <div className="absolute inset-0 bg-black/50 z-0"></div>
           </div>
-          {/* [แก้ไข 7] ลบปุ่ม Mute ออก เหลือแต่ปุ่ม LogOut */}
-          <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
-              <button onClick={() => { localStorage.removeItem('math_game_session_players'); localStorage.removeItem('math_game_session_index'); onExit(); }} className="bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
-          </div>
+          {/* ปุ่ม Mute ถูกเอาออกแล้ว เหลือแค่ LogOut */}
+          <button onClick={() => { localStorage.removeItem('math_game_session_players'); localStorage.removeItem('math_game_session_index'); onExit(); }} className="absolute top-4 left-4 z-50 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
           <div className="relative w-full h-full max-w-[100vh] max-h-[75vw] md:max-w-[calc(80vw-2rem)] md:max-h-[calc(100vh-2rem)] aspect-[4/3] shadow-2xl rounded-3xl overflow-hidden border-4 border-slate-700/50 backdrop-blur-sm m-4">
                 <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none"><path d={pathD} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1, 3" /><path d={pathD} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 {tiles.map((t, i) => {
@@ -207,7 +267,6 @@ export const GameBoard: React.FC<Props> = ({
                                 <img src={p.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-lg object-cover" referrerPolicy="no-referrer" alt="Player" />
                             ) : (
                                 <CharacterSvg 
-                                    // Cast type เพื่อแก้ error
                                     type={(p.appearance?.base === 'BOY' ? theme.player1Char : theme.player2Char) as CharacterType} 
                                     className="w-full h-full filter drop-shadow-lg" 
                                     appearance={p.appearance}

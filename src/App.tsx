@@ -26,7 +26,6 @@ export function App() {
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState<string>('');
   
-  // [เพิ่มใหม่] State เก็บรูป Avatar ผู้มาเยือน
   const [currentGuestAvatar, setCurrentGuestAvatar] = useState<string>('');
 
   const [gameMode, setGameMode] = useState<ScoringMode>('CLASSROOM');
@@ -97,24 +96,47 @@ export function App() {
     return student.sessions.some(s => s.mode === 'CLASSROOM' && s.date === today);
   };
 
-  // [แก้ไข] รับ avatar มาด้วย และบันทึก
   const handleLogin = (role: UserRole, id: string, guestNickname?: string, guestAvatar?: string) => {
     if (role === 'TEACHER') setScreen('DASHBOARD');
     else {
       setCurrentStudentId(id);
       if (id === '00' && guestNickname) {
           setGuestName(guestNickname);
-          // เก็บค่ารูปภาพที่ส่งมาจาก LoginScreen
           if (guestAvatar) setCurrentGuestAvatar(guestAvatar);
       }
       setScreen('MODE_SELECT');
     }
   };
 
-  // [ฟังก์ชันใหม่] แปลง Emoji เป็นรูปภาพ (SVG Data URL)
+  // [แก้ไข] เพิ่มการสุ่มสีพื้นหลัง Gradient สวยๆ ให้รูปผู้มาเยือน
   const emojiToDataUrl = (emoji: string) => {
-    // ปรับแต่งให้ Emoji อยู่กึ่งกลาง
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="55%" font-size="80" text-anchor="middle" dominant-baseline="central">${emoji}</text></svg>`;
+    // ชุดสี Gradient สดใส (Pastel & Vivid)
+    const gradients = [
+        ['#ff9a9e', '#fecfef'], // ชมพูหวาน
+        ['#a18cd1', '#fbc2eb'], // ม่วงพาสเทล
+        ['#84fab0', '#8fd3f4'], // เขียวฟ้าสดใส
+        ['#fccb90', '#d57eeb'], // ส้มม่วง
+        ['#e0c3fc', '#8ec5fc'], // ม่วงฟ้า
+        ['#ffecd2', '#fcb69f'], // ส้มพีช
+        ['#ff9a9e', '#fecfef'], // แดงชมพู
+    ];
+    // สุ่มสีจาก Emoji เพื่อให้ได้สีเดิมเสมอสำหรับ Emoji ตัวเดิม (ใช้ charCodeAt)
+    const colorIndex = emoji.charCodeAt(0) % gradients.length;
+    const [c1, c2] = gradients[colorIndex];
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${c1}" />
+            <stop offset="100%" stop-color="${c2}" />
+          </linearGradient>
+        </defs>
+        <rect width="100" height="100" fill="url(#grad)" />
+        <text x="50%" y="55%" font-size="70" text-anchor="middle" dominant-baseline="central">${emoji}</text>
+      </svg>
+    `.trim();
+    
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
@@ -133,7 +155,7 @@ export function App() {
               <div className="bg-blue-400 p-4 rounded-full shadow-lg border-4 border-white animate-bounce" style={{ animationDelay: '0.2s' }}><Backpack className="text-white w-10 h-10" /></div>
               <div className="bg-pink-400 p-4 rounded-full shadow-lg border-4 border-white animate-bounce" style={{ animationDelay: '0.4s' }}><BookOpen className="text-white w-10 h-10" /></div>
           </div>
-          <h2 className="text-3xl font-bold text-white mb-2 py-2 text-center leading-relaxed">รอโหลดสักครู่นะครับ</h2>
+          <h2 className="text-2xl font-bold text-white mb-2 py-2 text-center leading-relaxed">รอโหลดสักครู่นะครับ</h2>
           <div className={`flex items-center gap-2 font-bold mb-8 h-8 text-sm px-5 py-1 rounded-full border border-white/20 transition-all duration-500 ${loadProgress === 100 ? 'bg-green-500 text-white' : 'bg-indigo-900/30 text-indigo-50'}`}>
             {loadProgress === 100 ? <CheckCircle2 size={16}/> : <CloudSync size={16} className="animate-spin" />} 
             {loadStatus}
@@ -196,7 +218,6 @@ export function App() {
                                 targetTheme = realThemes[Math.floor(Math.random() * realThemes.length)];
                             }
 
-                            // [แก้ไข] ล้างข้อมูลเก่าทิ้ง เพื่อบังคับใช้รูปใหม่
                             localStorage.removeItem('math_game_session_players');
                             localStorage.removeItem('math_game_session_index');
 
@@ -212,12 +233,11 @@ export function App() {
                                     nickname:guestName, 
                                     gender:'MALE', 
                                     classroom:'ทั่วไป', 
-                                    // [แก้ไขสำคัญ] ยัดรูป Emoji ที่แปลงแล้วลงไปเป็น profileImage
                                     profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
                                     appearance:{base:'BOY', skinColor:'#fcd34d'}, 
                                     sessions:[]
                                 }), 
-                                position:0, score:0, character:'BOY', calculatorUsesLeft:2, isFinished:false
+                                position:0, score:0, character:'BOY', calculatorUsesLeft:0, isFinished:false
                             }]); 
                             setSessionDetails([]);
                         }} 
