@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-// [แก้ไข] เพิ่ม type ที่จำเป็น
 import type { UserRole, StudentProfile } from '../types';
 import { StorageService } from '../services/storage';
-// [แก้ไข] ลบ Minus, X ที่ไม่ได้ใช้ออก
 import { User, Star, GraduationCap, Plus, Divide, Calculator, Infinity, Pi, Sigma } from 'lucide-react';
 
+// ประกาศ Animation ไว้ด้านนอก
+const scaleKeyframes = `
+@keyframes scale-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+`;
+
 interface Props {
-  // [แก้ไข] เพิ่ม guestAvatar? เพื่อส่งรูปออกไป
   onLogin: (role: UserRole, id: string, guestNickname?: string, guestAvatar?: string) => void;
 }
 
@@ -38,8 +43,11 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
   }, [studentId]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex flex-col items-center justify-start md:justify-center p-4 overflow-y-auto relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex flex-col items-center justify-start md:justify-center p-4 overflow-y-auto relative overflow-hidden font-['Mali']">
       
+      {/* เรียกใช้ Animation */}
+      <style>{scaleKeyframes}</style>
+
       {/* Background Decorations */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-25">
          <Plus className="absolute top-[10%] left-[5%] text-white w-12 h-12 animate-float" />
@@ -65,16 +73,34 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
               <div className="space-y-6">
                 <div className="relative">
                   <User className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-400" size={24}/>
-                  <input type="text" inputMode="numeric" value={studentId} onChange={(e)=>setStudentId(e.target.value.replace(/\D/g,''))} className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl py-4 pl-14 pr-4 text-white text-xl font-bold focus:border-blue-500 outline-none transition-all placeholder:text-[0.8rem]" placeholder="กรุณาใส่เลขที่ตนเอง" />
+                  <input 
+                    type="text" 
+                    inputMode="numeric" 
+                    value={studentId} 
+                    onChange={(e)=>setStudentId(e.target.value.replace(/\D/g,''))} 
+                    className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl py-5 pl-14 pr-4 text-white text-xl font-bold focus:border-blue-500 outline-none transition-all placeholder:text-lg placeholder:font-bold leading-[3rem]" 
+                    placeholder="ใส่เลขที่ตนเอง" 
+                  />
                 </div>
-                <p className="text-[0.7rem] md:text-xs text-indigo-100/70 font-bold italic text-center px-2">** หมายเหตุ: โหมดผู้มาเยือน ใส่เลขที่ 00 **</p>
+
+                {/* [แก้ไข] เป็นกล่องสีทอง ขยับได้ แต่กดไม่ได้ (ลบ onClick และ cursor-pointer ออกแล้ว) */}
+                <div className="mt-4 mb-2 flex justify-center">
+                    <div 
+                        className="bg-yellow-500/20 border-2 border-yellow-400/50 rounded-xl px-4 py-2 shadow-[0_0_15px_rgba(250,204,21,0.3)] backdrop-blur-sm"
+                        style={{ animation: 'scale-pulse 2.5s infinite ease-in-out' }}
+                    >
+                        <p className="text-sm md:text-base text-yellow-300 font-bold text-center">
+                            ✨ หมายเหตุ: โหมดผู้มาเยือน <span className="text-white text-lg underline decoration-2 underline-offset-4 drop-shadow-md ml-1">ใส่เลขที่ 00</span> ✨
+                        </p>
+                    </div>
+                </div>
+
                 <button 
-                    onClick={() => { 
+                  onClick={() => { 
                         if (studentId === '00') {
-                            // [แก้ไข] ส่ง guestAvatar ไปด้วย (แก้แค่ตรงนี้)
                             onLogin('STUDENT', '00', 'ผู้มาเยือน', guestAvatar);
                         } else if (foundStudent) {
-                            onLogin('STUDENT', studentId); 
+                            onLogin('STUDENT', studentId);
                         } else {
                             alert('ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบเลขที่');
                         }
