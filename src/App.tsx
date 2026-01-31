@@ -7,7 +7,7 @@ import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail } 
 import { 
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
-  Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle
+  Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle, Plane // [เพิ่ม] Plane
 } from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
 
@@ -38,6 +38,9 @@ export function App() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
   const isDataLoaded = useRef(false);
+
+  // [เพิ่ม] State สำหรับหน้าเครื่องบิน
+  const [isGameLoading, setIsGameLoading] = useState(false);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -135,8 +138,11 @@ export function App() {
   const renderContent = () => {
     const transitionScreens = ['LOGIN', 'MODE_SELECT', 'THEME_SELECT'];
     if (transitionScreens.includes(screen)) {
+      // [แก้ไข] เปลี่ยน Key ถ้ากำลังโหลดเครื่องบิน เพื่อให้เกิด Animation เปลี่ยนหน้า
+      const contentKey = (screen === 'THEME_SELECT' && isGameLoading) ? 'LOADING_PLANE' : screen;
+
       return (
-        <PageTransition contentKey={screen}>
+        <PageTransition contentKey={contentKey}>
           {screen === 'LOGIN' && <LoginScreen onLogin={handleLogin} />}
           {screen === 'MODE_SELECT' && (
             <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start md:justify-center p-4 py-10 md:p-8 bg-slate-900 text-white font-bold">
@@ -153,7 +159,7 @@ export function App() {
                    <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">ห้องเรียนหรรษา</h2>
                    <p className="text-slate-400 text-sm md:text-lg text-center">{hasPlayedClassroomToday() ? 'วันนี้คุณเล่นเก็บคะแนนครบแล้วครับ 😊' : 'เข้าฐานโจทย์เก็บคะแนน'}</p>
                 </button>
-
+    
                 <button onClick={() => { setGameMode('FREEPLAY'); setScreen('THEME_SELECT'); }} className="group relative bg-slate-800 p-8 md:p-12 rounded-[40px] border-4 border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105 shadow-2xl overflow-hidden active:scale-95">
                    <Gamepad2 className="text-cyan-400 mb-4 md:mb-6 mx-auto group-hover:-rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" size={80} />
                    <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">เล่นตามใจ</h2>
@@ -163,68 +169,91 @@ export function App() {
               <button onClick={() => setScreen('LOGIN')} className="mt-10 md:mt-16 text-slate-500 underline font-bold hover:text-white transition-colors text-lg">ออกจากระบบ</button>
             </div>
           )}
+
           {screen === 'THEME_SELECT' && (
             <div className="flex-1 overflow-y-auto p-6 py-10 bg-slate-900 text-white flex flex-col items-center">
-               <h1 className="text-4xl md:text-5xl font-bold mb-10 py-6 text-center leading-[1.8]">เลือกดินแดนผจญภัย</h1>
-               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-7xl w-full px-4">
-                  {THEMES.map((theme) => {
-                      const bgUrl = themeBackgrounds[theme.id];
-                      const hasCustomBg = bgUrl && bgUrl.trim() !== '';
+               
+               {/* [เพิ่ม] ส่วนหน้าโหลดเครื่องบิน (แสดงเมื่อ isGameLoading = true) */}
+               {isGameLoading ? (
+                    <div className="h-full flex flex-col items-center justify-center animate-pulse">
+                         <div className="relative">
+                            <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-ping"></div>
+                            <Plane size={80} className="mb-6 relative z-10 text-yellow-300 animate-bounce" />
+                          </div>
+                          <h2 className="text-3xl font-black mb-2 mt-8">กำลังเดินทาง...</h2>
+                          <p className="text-xl opacity-80">สู่ดินแดน {selectedTheme?.name}</p>
+                    </div>
+               ) : (
+                 <>
+                   <h1 className="text-4xl md:text-5xl font-bold mb-10 py-6 text-center leading-[1.8]">เลือกดินแดนผจญภัย</h1>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-7xl w-full px-4">
+                      {THEMES.map((theme) => {
+                          const bgUrl = themeBackgrounds[theme.id];
+                          const hasCustomBg = bgUrl && bgUrl.trim() !== '';
 
-                      return (
-                        <button 
-                            key={theme.id} 
-                            onClick={() => { 
-                                let targetTheme = theme;
-                                if (theme.id === 'random') {
-                                    const realThemes = THEMES.filter(t => t.id !== 'random');
-                                    targetTheme = realThemes[Math.floor(Math.random() * realThemes.length)];
-                                }
+                          return (
+                            <button 
+                                key={theme.id} 
+                                onClick={() => { 
+                                    let targetTheme = theme;
+                                    if (theme.id === 'random') {
+                                        const realThemes = THEMES.filter(t => t.id !== 'random');
+                                        targetTheme = realThemes[Math.floor(Math.random() * realThemes.length)];
+                                    }
 
-                                localStorage.removeItem('math_game_session_players');
-                                localStorage.removeItem('math_game_session_index');
+                                    localStorage.removeItem('math_game_session_players');
+                                    localStorage.removeItem('math_game_session_index');
 
-                                setSelectedTheme(targetTheme); 
-                                setScreen('GAME'); 
+                                    setSelectedTheme(targetTheme); 
+                                    
+                                    // [คงเดิม] ใช้ Logic เดิม 100% เพื่อไม่ให้กระทบบอร์ดเกม
+                                    const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
+                                    setGamePlayers([{
+                                        ...(s || {
+                                            id:'00', 
+                                            firstName:guestName, 
+                                            lastName: '', 
+                                            nickname:guestName, 
+                                            gender:'MALE', 
+                                            classroom:'ทั่วไป', 
+                                            profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
+                                            appearance:{base:'BOY', skinColor:'#fcd34d'}, 
+                                            sessions:[]
+                                        }), 
+                                        position:0, score:0, character:'BOY', 
+                                        calculatorUsesLeft: gameMode === 'FREEPLAY' ? 2 : 0, 
+                                        isFinished:false
+                                    }]); 
+                                    setSessionDetails([]);
+
+                                    // [เพิ่ม] เริ่มนับถอยหลังหน้าเครื่องบิน
+                                    setIsGameLoading(true);
+                                    setTimeout(() => {
+                                        setIsGameLoading(false);
+                                        setScreen('GAME'); 
+                                    }, 2000);
+                                }} 
+                                className="p-10 rounded-[35px] font-bold text-xl md:text-2xl text-white shadow-2xl hover:scale-105 transition-all relative overflow-hidden group border-4 border-white/5 h-36 md:h-auto flex items-center justify-center text-center"
+                            >
+                                {hasCustomBg ? (
+                                    <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${bgUrl})` }}>
+                                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors"></div>
+                                    </div>
+                                ) : (
+                                    <div className={`absolute inset-0 bg-gradient-to-br ${theme.id === 'random' ? 'from-indigo-600 via-purple-600 to-pink-600 animate-gradient-xy' : theme.id === 'space' ? 'from-blue-900 to-black' : theme.id === 'jungle' ? 'from-green-800 to-emerald-900' : 'from-gray-700 to-gray-900'}`}></div>
+                                )}
                                 
-                                const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
-                                setGamePlayers([{
-                                    ...(s || {
-                                        id:'00', 
-                                        firstName:guestName, 
-                                        lastName: '', 
-                                        nickname:guestName, 
-                                        gender:'MALE', 
-                                        classroom:'ทั่วไป', 
-                                        profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
-                                        appearance:{base:'BOY', skinColor:'#fcd34d'}, 
-                                        sessions:[]
-                                    }), 
-                                    position:0, score:0, character:'BOY', 
-                                    calculatorUsesLeft: gameMode === 'FREEPLAY' ? 2 : 0, 
-                                    isFinished:false
-                                }]); 
-                                setSessionDetails([]);
-                            }} 
-                            className="p-10 rounded-[35px] font-bold text-xl md:text-2xl text-white shadow-2xl hover:scale-105 transition-all relative overflow-hidden group border-4 border-white/5 h-36 md:h-auto flex items-center justify-center text-center"
-                        >
-                            {hasCustomBg ? (
-                                <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${bgUrl})` }}>
-                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors"></div>
+                                <div className="relative z-10 drop-shadow-md flex flex-col items-center gap-2">
+                                    {theme.id === 'random' && <Shuffle size={32} className="animate-spin-slow mb-1" />}
+                                    <span>{theme.name}</span>
                                 </div>
-                            ) : (
-                                <div className={`absolute inset-0 bg-gradient-to-br ${theme.id === 'random' ? 'from-indigo-600 via-purple-600 to-pink-600 animate-gradient-xy' : theme.id === 'space' ? 'from-blue-900 to-black' : theme.id === 'jungle' ? 'from-green-800 to-emerald-900' : 'from-gray-700 to-gray-900'}`}></div>
-                            )}
-                            
-                            <div className="relative z-10 drop-shadow-md flex flex-col items-center gap-2">
-                                {theme.id === 'random' && <Shuffle size={32} className="animate-spin-slow mb-1" />}
-                                <span>{theme.name}</span>
-                            </div>
-                        </button>
-                      );
-                  })}
-               </div>
-               <button onClick={() => setScreen('MODE_SELECT')} className="mt-12 text-slate-500 underline font-bold text-xl">ย้อนกลับ</button>
+                            </button>
+                          );
+                      })}
+                   </div>
+                   <button onClick={() => setScreen('MODE_SELECT')} className="mt-12 text-slate-500 underline font-bold text-xl">ย้อนกลับ</button>
+                 </>
+               )}
             </div>
           )}
         </PageTransition>
