@@ -9,6 +9,7 @@ import {
   Plus, Divide,
   Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle
 } from 'lucide-react';
+import { PageTransition } from './components/PageTransition';
 
 const THEMES: ThemeConfig[] = [
   { id: 'jungle', name: 'ป่ามหาสนุก', bgClass: 'jungle', primaryColor: 'green', secondaryColor: 'orange', decorations: [], bgmUrls: [] },
@@ -131,6 +132,141 @@ export function App() {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
+  const renderContent = () => {
+    const transitionScreens = ['LOGIN', 'MODE_SELECT', 'THEME_SELECT'];
+    if (transitionScreens.includes(screen)) {
+      return (
+        <PageTransition contentKey={screen}>
+          {screen === 'LOGIN' && <LoginScreen onLogin={handleLogin} />}
+          {screen === 'MODE_SELECT' && (
+            <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start md:justify-center p-4 py-10 md:p-8 bg-slate-900 text-white font-bold">
+              <h1 className="text-2xl md:text-5xl font-black mb-8 md:mb-16 py-10 px-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-green-400 text-center drop-shadow-sm leading-[2.5]">
+                คิดเลขสนุก BY ครูแบ็ค
+              </h1>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full px-4">
+                <button 
+                  disabled={hasPlayedClassroomToday()}
+                  onClick={() => { setGameMode('CLASSROOM'); setScreen('THEME_SELECT'); }} 
+                  className={`group relative p-8 md:p-12 rounded-[40px] border-4 transition-all shadow-2xl overflow-hidden ${hasPlayedClassroomToday() ? 'bg-slate-800/50 border-slate-700 opacity-60 grayscale cursor-not-allowed' : 'bg-slate-800 border-orange-500/30 hover:border-orange-400 hover:scale-105 active:scale-95'}`}
+                >
+                   {hasPlayedClassroomToday() ? <Lock className="text-slate-500 mb-6 mx-auto" size={80}/> : <Star className="text-orange-400 mb-4 md:mb-6 mx-auto group-hover:rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" fill="currentColor" />}
+                   <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">ห้องเรียนหรรษา</h2>
+                   <p className="text-slate-400 text-sm md:text-lg text-center">{hasPlayedClassroomToday() ? 'วันนี้คุณเล่นเก็บคะแนนครบแล้วครับ 😊' : 'เข้าฐานโจทย์เก็บคะแนน'}</p>
+                </button>
+
+                <button onClick={() => { setGameMode('FREEPLAY'); setScreen('THEME_SELECT'); }} className="group relative bg-slate-800 p-8 md:p-12 rounded-[40px] border-4 border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105 shadow-2xl overflow-hidden active:scale-95">
+                   <Gamepad2 className="text-cyan-400 mb-4 md:mb-6 mx-auto group-hover:-rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" size={80} />
+                   <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">เล่นตามใจ</h2>
+                   <p className="text-slate-400 text-sm md:text-lg text-center">สุ่มโจทย์จากคลังมหาสนุก</p>
+                </button>
+              </div>
+              <button onClick={() => setScreen('LOGIN')} className="mt-10 md:mt-16 text-slate-500 underline font-bold hover:text-white transition-colors text-lg">ออกจากระบบ</button>
+            </div>
+          )}
+          {screen === 'THEME_SELECT' && (
+            <div className="flex-1 overflow-y-auto p-6 py-10 bg-slate-900 text-white flex flex-col items-center">
+               <h1 className="text-4xl md:text-5xl font-bold mb-10 py-6 text-center leading-[1.8]">เลือกดินแดนผจญภัย</h1>
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-7xl w-full px-4">
+                  {THEMES.map((theme) => {
+                      const bgUrl = themeBackgrounds[theme.id];
+                      const hasCustomBg = bgUrl && bgUrl.trim() !== '';
+
+                      return (
+                        <button 
+                            key={theme.id} 
+                            onClick={() => { 
+                                let targetTheme = theme;
+                                if (theme.id === 'random') {
+                                    const realThemes = THEMES.filter(t => t.id !== 'random');
+                                    targetTheme = realThemes[Math.floor(Math.random() * realThemes.length)];
+                                }
+
+                                localStorage.removeItem('math_game_session_players');
+                                localStorage.removeItem('math_game_session_index');
+
+                                setSelectedTheme(targetTheme); 
+                                setScreen('GAME'); 
+                                
+                                const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
+                                setGamePlayers([{
+                                    ...(s || {
+                                        id:'00', 
+                                        firstName:guestName, 
+                                        lastName: '', 
+                                        nickname:guestName, 
+                                        gender:'MALE', 
+                                        classroom:'ทั่วไป', 
+                                        profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
+                                        appearance:{base:'BOY', skinColor:'#fcd34d'}, 
+                                        sessions:[]
+                                    }), 
+                                    position:0, score:0, character:'BOY', 
+                                    calculatorUsesLeft: gameMode === 'FREEPLAY' ? 2 : 0, 
+                                    isFinished:false
+                                }]); 
+                                setSessionDetails([]);
+                            }} 
+                            className="p-10 rounded-[35px] font-bold text-xl md:text-2xl text-white shadow-2xl hover:scale-105 transition-all relative overflow-hidden group border-4 border-white/5 h-36 md:h-auto flex items-center justify-center text-center"
+                        >
+                            {hasCustomBg ? (
+                                <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${bgUrl})` }}>
+                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors"></div>
+                                </div>
+                            ) : (
+                                <div className={`absolute inset-0 bg-gradient-to-br ${theme.id === 'random' ? 'from-indigo-600 via-purple-600 to-pink-600 animate-gradient-xy' : theme.id === 'space' ? 'from-blue-900 to-black' : theme.id === 'jungle' ? 'from-green-800 to-emerald-900' : 'from-gray-700 to-gray-900'}`}></div>
+                            )}
+                            
+                            <div className="relative z-10 drop-shadow-md flex flex-col items-center gap-2">
+                                {theme.id === 'random' && <Shuffle size={32} className="animate-spin-slow mb-1" />}
+                                <span>{theme.name}</span>
+                            </div>
+                        </button>
+                      );
+                  })}
+               </div>
+               <button onClick={() => setScreen('MODE_SELECT')} className="mt-12 text-slate-500 underline font-bold text-xl">ย้อนกลับ</button>
+            </div>
+          )}
+        </PageTransition>
+      );
+    }
+
+    if (screen === 'DASHBOARD') {
+      return <TeacherDashboard onLogout={() => setScreen('LOGIN')} />;
+    }
+
+    if (screen === 'GAME' && selectedTheme) {
+      return (
+        <GameBoard 
+            players={gamePlayers} 
+            currentPlayerIndex={0} 
+            theme={selectedTheme} 
+            gameMode={gameMode} 
+            questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()} 
+            onTurnComplete={(p) => setGamePlayers(p)} 
+            onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
+            onGameEnd={() => { 
+                if (currentStudentId) {
+                  StorageService.addSession(currentStudentId, { 
+                      sessionId: Date.now().toString(), 
+                      date: new Date().toISOString().split('T')[0], 
+                      timestamp: new Date().toISOString(), 
+                      score: gamePlayers[0].score, 
+                      mode: gameMode, 
+                      details: sessionDetails 
+                  });
+                }
+                setScreen('MODE_SELECT'); 
+                setSelectedTheme(null); 
+            }} 
+            onExit={() => setScreen('MODE_SELECT')} 
+        />
+      );
+    }
+
+    return null;
+  };
+
   if (screen === 'LOADING') {
     return (
       <div className="min-h-screen w-full bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center p-6 relative overflow-hidden">
@@ -162,114 +298,7 @@ export function App() {
 
   return (
     <div className="h-full w-full bg-slate-900 overflow-hidden flex flex-col font-sans" style={{ fontFamily: "'Mali', cursive" }}>
-      {screen === 'LOGIN' && <LoginScreen onLogin={handleLogin} />}
-      {screen === 'DASHBOARD' && <TeacherDashboard onLogout={() => setScreen('LOGIN')} />}
-      
-      {screen === 'MODE_SELECT' && (
-        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start md:justify-center p-4 py-10 md:p-8 bg-slate-900 text-white font-bold">
-          <h1 className="text-2xl md:text-5xl font-black mb-8 md:mb-16 py-10 px-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-green-400 text-center drop-shadow-sm leading-[2.5]">
-            คิดเลขสนุก BY ครูแบ็ค
-          </h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full px-4">
-            <button 
-              disabled={hasPlayedClassroomToday()}
-              onClick={() => { setGameMode('CLASSROOM'); setScreen('THEME_SELECT'); }} 
-              className={`group relative p-8 md:p-12 rounded-[40px] border-4 transition-all shadow-2xl overflow-hidden ${hasPlayedClassroomToday() ? 'bg-slate-800/50 border-slate-700 opacity-60 grayscale cursor-not-allowed' : 'bg-slate-800 border-orange-500/30 hover:border-orange-400 hover:scale-105 active:scale-95'}`}
-            >
-               {hasPlayedClassroomToday() ? <Lock className="text-slate-500 mb-6 mx-auto" size={80}/> : <Star className="text-orange-400 mb-4 md:mb-6 mx-auto group-hover:rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" fill="currentColor" />}
-               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">ห้องเรียนหรรษา</h2>
-               <p className="text-slate-400 text-sm md:text-lg text-center">{hasPlayedClassroomToday() ? 'วันนี้คุณเล่นเก็บคะแนนครบแล้วครับ 😊' : 'เข้าฐานโจทย์เก็บคะแนน'}</p>
-            </button>
-
-            <button onClick={() => { setGameMode('FREEPLAY'); setScreen('THEME_SELECT'); }} className="group relative bg-slate-800 p-8 md:p-12 rounded-[40px] border-4 border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105 shadow-2xl overflow-hidden active:scale-95">
-               <Gamepad2 className="text-cyan-400 mb-4 md:mb-6 mx-auto group-hover:-rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" size={80} />
-               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">เล่นตามใจ</h2>
-               <p className="text-slate-400 text-sm md:text-lg text-center">สุ่มโจทย์จากคลังมหาสนุก</p>
-            </button>
-          </div>
-          <button onClick={() => setScreen('LOGIN')} className="mt-10 md:mt-16 text-slate-500 underline font-bold hover:text-white transition-colors text-lg">ออกจากระบบ</button>
-        </div>
-      )}
-
-      {screen === 'THEME_SELECT' && (
-        <div className="flex-1 overflow-y-auto p-6 py-10 bg-slate-900 text-white flex flex-col items-center">
-           <h1 className="text-4xl md:text-5xl font-bold mb-10 py-6 text-center leading-[1.8]">เลือกดินแดนผจญภัย</h1>
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-7xl w-full px-4">
-              {THEMES.map((theme) => {
-                  const bgUrl = themeBackgrounds[theme.id];
-                  const hasCustomBg = bgUrl && bgUrl.trim() !== '';
-
-                  return (
-                    <button 
-                        key={theme.id} 
-                        onClick={() => { 
-                            let targetTheme = theme;
-                            if (theme.id === 'random') {
-                                const realThemes = THEMES.filter(t => t.id !== 'random');
-                                targetTheme = realThemes[Math.floor(Math.random() * realThemes.length)];
-                            }
-
-                            localStorage.removeItem('math_game_session_players');
-                            localStorage.removeItem('math_game_session_index');
-
-                            setSelectedTheme(targetTheme); 
-                            setScreen('GAME'); 
-                            
-                            const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
-                            setGamePlayers([{
-                                ...(s || {
-                                    id:'00', 
-                                    firstName:guestName, 
-                                    lastName: '', 
-                                    nickname:guestName, 
-                                    gender:'MALE', 
-                                    classroom:'ทั่วไป', 
-                                    profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
-                                    appearance:{base:'BOY', skinColor:'#fcd34d'}, 
-                                    sessions:[]
-                                }), 
-                                // [แก้ไขสำคัญ] ถ้าเลือกเล่นตามใจ (FREEPLAY) ให้ 2 ครั้ง, ถ้าห้องเรียน (CLASSROOM) ให้ 0 ครั้ง
-                                position:0, score:0, character:'BOY', 
-                                calculatorUsesLeft: gameMode === 'FREEPLAY' ? 2 : 0, 
-                                isFinished:false
-                            }]); 
-                            setSessionDetails([]);
-                        }} 
-                        className="p-10 rounded-[35px] font-bold text-xl md:text-2xl text-white shadow-2xl hover:scale-105 transition-all relative overflow-hidden group border-4 border-white/5 h-36 md:h-auto flex items-center justify-center text-center"
-                    >
-                        {hasCustomBg ? (
-                            <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${bgUrl})` }}>
-                                <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors"></div>
-                            </div>
-                        ) : (
-                            <div className={`absolute inset-0 bg-gradient-to-br ${theme.id === 'random' ? 'from-indigo-600 via-purple-600 to-pink-600 animate-gradient-xy' : theme.id === 'space' ? 'from-blue-900 to-black' : theme.id === 'jungle' ? 'from-green-800 to-emerald-900' : 'from-gray-700 to-gray-900'}`}></div>
-                        )}
-                        
-                        <div className="relative z-10 drop-shadow-md flex flex-col items-center gap-2">
-                            {theme.id === 'random' && <Shuffle size={32} className="animate-spin-slow mb-1" />}
-                            <span>{theme.name}</span>
-                        </div>
-                    </button>
-                  );
-              })}
-           </div>
-           <button onClick={() => setScreen('MODE_SELECT')} className="mt-12 text-slate-500 underline font-bold text-xl">ย้อนกลับ</button>
-        </div>
-      )}
-
-      {screen === 'GAME' && selectedTheme && (
-        <GameBoard 
-            players={gamePlayers} currentPlayerIndex={0} theme={selectedTheme} gameMode={gameMode} 
-            questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()} 
-            onTurnComplete={(p) => setGamePlayers(p)} 
-            onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
-            onGameEnd={() => { 
-                StorageService.addSession(currentStudentId!, { sessionId: Date.now().toString(), date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString(), score: gamePlayers[0].score, mode: gameMode, details: sessionDetails });
-                setScreen('MODE_SELECT'); setSelectedTheme(null); 
-            }} 
-            onExit={() => setScreen('MODE_SELECT')} 
-        />
-      )}
+      {renderContent()}
     </div>
   );
 }
