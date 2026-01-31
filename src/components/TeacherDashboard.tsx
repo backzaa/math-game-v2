@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StorageService } from '../services/storage'; 
-import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types'; 
+import { StorageService } from '../services/storage';
+import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types';
 import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, CheckCircle2, XCircle, Clock, BarChart } from 'lucide-react';
 
 interface Props {
@@ -8,6 +8,21 @@ interface Props {
   onUpdateBgm?: (url: string) => void;
   onUpdateQuestions?: (qs: MathQuestion[]) => void;
 }
+
+// [แก้ไข] ฟังก์ชันแปลงลิงก์ Google Drive เป็น Direct Link แบบ lh3 (แสดงผลไวและชัวร์กว่า)
+const getDirectImageLink = (url: string) => {
+    if (!url) return '';
+    // ตรวจสอบว่าเป็นลิงก์ Google Drive หรือไม่ (รองรับทั้ง /file/d/ และ id=)
+    if (url.includes('drive.google.com') || url.includes('drive.google.com/file/d/')) {
+        // ดึง ID ด้วย Regex ที่ครอบคลุมกว่าเดิม
+        const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+        if (idMatch && idMatch[1]) {
+             // ใช้ lh3.googleusercontent.com/d/ ซึ่งเป็น CDN ตรงของ Google (แสดงภาพได้ทันที)
+             return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+        }
+    }
+    return url;
+};
 
 export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<'REPORTS' | 'QUESTIONS' | 'STUDENTS' | 'ASSETS'>('REPORTS');
@@ -23,22 +38,22 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       max: 20, 
       operators: { add: true, sub: true, mul: false, div: false } 
   });
-  
+
   const [generatedQuestions, setGeneratedQuestions] = useState<MathQuestion[]>([]);
   const [newCustomQ, setNewCustomQ] = useState({ q: '', opts: ['', '', '', ''], correctIdx: 0 });
 
   const [gameConfig, setGameConfig] = useState<{ themeBackgrounds: Record<string, string>, bgmPlaylist: string[] }>({ themeBackgrounds: {}, bgmPlaylist: [] });
   const [bgmInput, setBgmInput] = useState('');
+
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentForm, setStudentForm] = useState({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE' as Gender, classroom: '', profileImage: '', base: 'BOY' as CharacterBase, skinColor: '#fcd34d' as SkinColor });
 
   const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
 
-  // [แก้ไขจุดสำคัญ] เปลี่ยนฟังก์ชันโหลดข้อมูลให้อ่านจาก "ในเครื่อง" เท่านั้น (เร็วทันที)
   const loadDataFromLocal = () => {
       // 1. ดึงนักเรียน
-      setStudents(StorageService.getAllStudents()); 
+      setStudents(StorageService.getAllStudents());
       
       // 2. ดึงการตั้งค่า
       const cfg = StorageService.getGameConfig();
@@ -47,18 +62,16 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
           setBgmInput((cfg.bgmPlaylist || []).join('\n'));
       }
 
-      // 3. ดึงโจทย์ (แยกโหมดชัดเจน)
+      // 3. ดึงโจทย์
       let currentQs: MathQuestion[] = [];
       if (questionSettingMode === 'CLASSROOM') {
           currentQs = StorageService.getDailyQuestions();
       } else {
-          // ใช้ฟังก์ชันที่แก้ให้แล้วใน storage.ts
-          currentQs = StorageService.getFreeplayQuestions(); 
+          currentQs = StorageService.getFreeplayQuestions();
       }
       setGeneratedQuestions(Array.isArray(currentQs) ? currentQs : []);
   };
 
-  // เรียกใช้เมื่อเปลี่ยนแท็บ หรือเปลี่ยนโหมดโจทย์ (จะทำงานทันที ไม่ต้องรอดาวน์โหลด)
   useEffect(() => { loadDataFromLocal(); }, [activeTab, questionSettingMode]);
 
   const handleGenerateRandom = () => { 
@@ -89,7 +102,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
               const fake = ans + (Math.floor(Math.random() * 11) - 5);
               if (fake >= 0 && fake !== ans) options.add(fake);
           }
-          generated.push({ id: Date.now() + '_' + i, question: qStr, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) }); 
+          generated.push({ id: Date.now() + '_' + i, question: qStr, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) });
       } 
       setGeneratedQuestions(generated); 
   };
@@ -99,9 +112,13 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
     const ans = parseInt(newCustomQ.opts[newCustomQ.correctIdx]);
     const opts = newCustomQ.opts.map(o => parseInt(o));
     const newQ = { id: Date.now().toString(), question: newCustomQ.q, answer: ans, options: opts };
+    
     if (questionSettingMode === 'CLASSROOM' && generatedQuestions.length >= 10) {
         if(confirm("โหมดหรรษาต้องมี 10 ข้อ ต้องการเขียนทับข้อเดิมหรือไม่?")) setGeneratedQuestions([...generatedQuestions.slice(0, 9), newQ]);
-    } else { setGeneratedQuestions([...generatedQuestions, newQ]); setNewCustomQ({ q: '', opts: ['', '', '', ''], correctIdx: 0 }); }
+    } else { 
+        setGeneratedQuestions([...generatedQuestions, newQ]); 
+        setNewCustomQ({ q: '', opts: ['', '', '', ''], correctIdx: 0 }); 
+    }
   };
 
   const handleSaveQuestions = async () => {
@@ -109,9 +126,38 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
         if (questionSettingMode === 'CLASSROOM') {
             if (generatedQuestions.length !== 10) { alert('โหมดห้องเรียนหรรษาต้องมีครบ 10 ข้อครับ'); return; }
             await StorageService.saveDailyQuestions(generatedQuestions);
-        } else { await StorageService.saveFreeplayQuestions(generatedQuestions); }
+        } else { 
+            await StorageService.saveFreeplayQuestions(generatedQuestions);
+        }
         alert('บันทึกโจทย์สำเร็จแล้วครับ!'); loadDataFromLocal();
     } catch (error) { alert('เกิดข้อผิดพลาดในการบันทึก'); }
+  };
+
+  // [เพิ่มใหม่] ฟังก์ชันบันทึกการตั้งค่า (Assets)
+  const handleSaveAssets = () => {
+      try {
+          const playlist = bgmInput.split('\n').map(s => s.trim()).filter(s => s !== '');
+          
+          // แปลงลิงก์พื้นหลังทั้งหมดให้เป็น Direct Link (lh3...) ก่อนบันทึก
+          const convertedBackgrounds = { ...gameConfig.themeBackgrounds };
+          Object.keys(convertedBackgrounds).forEach(key => {
+              convertedBackgrounds[key] = getDirectImageLink(convertedBackgrounds[key]);
+          });
+
+          const newConfig = {
+              themeBackgrounds: convertedBackgrounds,
+              bgmPlaylist: playlist
+          };
+
+          StorageService.saveGameConfig(newConfig);
+          
+          // อัปเดตหน้าจอทันที
+          setGameConfig(prev => ({ ...prev, themeBackgrounds: convertedBackgrounds }));
+          
+          alert('บันทึกการตั้งค่าเรียบร้อยแล้วครับ!');
+      } catch (error) {
+          alert('เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
+      }
   };
 
   const handleSaveStudent = (e: React.FormEvent) => {
@@ -131,24 +177,18 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
        <header className="flex-none bg-slate-800 p-4 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
-          {/* ส่วนบน: หัวข้อ + ปุ่มออก (สำหรับมือถือ) */}
           <div className="flex justify-between items-center w-full md:w-auto">
               <h1 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">ระบบจัดการคุณครู</h1>
-              
-              {/* [แก้ไข] ปุ่มออก (แสดงเฉพาะมือถือ) อยู่มุมขวาบน กดง่าย */}
               <button onClick={onLogout} className="md:hidden text-red-400 hover:text-white flex items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 bg-slate-900/50">
                   <LogOut size={18}/> <span className="text-sm font-bold">ออก</span>
               </button>
           </div>
 
-          {/* ส่วนล่าง: เมนูแท็บ (เลื่อนแนวนอนได้ในมือถือ) + ปุ่มออก (สำหรับคอม) */}
           <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto overflow-x-auto md:overflow-visible pb-2 md:pb-0 custom-scrollbar">
              <button onClick={() => setActiveTab('REPORTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ผลการเรียน</button>
              <button onClick={() => setActiveTab('QUESTIONS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>จัดการโจทย์</button>
              <button onClick={() => setActiveTab('ASSETS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ตั้งค่าเกม</button>
              <button onClick={() => setActiveTab('STUDENTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>รายชื่อนักเรียน</button>
-             
-             {/* [แก้ไข] ปุ่มออก (แสดงเฉพาะคอมพิวเตอร์) */}
              <button onClick={onLogout} className="hidden md:flex text-red-400 hover:text-white items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 whitespace-nowrap ml-auto">
                 <LogOut size={18}/> ออก
              </button>
@@ -194,6 +234,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            </div>
                            <button onClick={handleGenerateRandom} className="w-full bg-blue-600 py-3 rounded-xl font-bold hover:bg-blue-500 flex justify-center gap-2 items-center"><Shuffle size={20}/> สุ่มโจทย์ใหม่</button>
                        </div>
+   
                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-600">
                            <h3 className="font-bold text-lg text-slate-300 mb-3">2. ตั้งโจทย์เอง (4 ตัวเลือก)</h3>
                            <input placeholder="โจทย์ (เช่น 25 + 14)" value={newCustomQ.q} onChange={e=>setNewCustomQ({...newCustomQ, q: e.target.value})} className="w-full bg-slate-800 p-3 rounded-xl border border-slate-500 mb-4 focus:border-pink-500 outline-none"/>
@@ -209,6 +250,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            <button onClick={handleAddCustom} className="w-full bg-pink-600 py-3 rounded-xl font-bold hover:bg-pink-500 flex justify-center gap-2 items-center"><PlusCircle size={20}/> เพิ่มโจทย์ลงรายการ</button>
                        </div>
                    </div>
+               
                    <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 h-[650px] flex flex-col shadow-inner">
                        <h3 className="font-bold text-lg text-slate-300 mb-2 text-center border-b border-slate-700 pb-2 flex justify-between items-center">
                            <span>รายการโจทย์ ({generatedQuestions.length} ข้อ)</span>
@@ -236,7 +278,11 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
        {activeTab === 'ASSETS' && (
            <div className="max-w-6xl mx-auto bg-slate-800 p-8 rounded-xl border border-slate-700 animate-pop-in">
-               <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-bold flex items-center gap-2"><Palette/> ตั้งค่าฉากและเสียง</h2><p className="text-xs text-green-400 animate-pulse bg-green-900/20 px-4 py-2 rounded-full border border-green-800">● บันทึกลง Google Sheet อัตโนมัติ</p></div>
+               <div className="flex justify-between items-center mb-8">
+                   <h2 className="text-2xl font-bold flex items-center gap-2"><Palette/> ตั้งค่าฉากและเสียง</h2>
+                   {/* [แก้ไข] เปลี่ยนข้อความบันทึกอัตโนมัติ เป็นปุ่มกดบันทึกแทน */}
+                   <button onClick={handleSaveAssets} className="bg-green-600 px-6 py-2 rounded-xl font-bold hover:bg-green-500 shadow-lg flex items-center gap-2 transition-all active:scale-95"><Save/> บันทึกการตั้งค่า</button>
+               </div>
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                    <div className="space-y-4">
                        <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4"><HardDrive/> ภาพพื้นหลังฉากต่างๆ</h3>
@@ -245,8 +291,13 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                <div key={theme.id} className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 hover:border-blue-500/50 transition">
                                    <label className="block text-sm font-bold text-blue-300 mb-2">{theme.label}</label>
                                    <div className="flex gap-3">
-                                       <input type="text" placeholder="URL รูปภาพ..." value={gameConfig.themeBackgrounds[theme.id] || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
-                                       {gameConfig.themeBackgrounds[theme.id] && (<div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg"><img src={gameConfig.themeBackgrounds[theme.id]} alt="p" className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>)}
+                                       <input type="text" placeholder="URL รูปภาพ (รองรับ Google Drive)" value={gameConfig.themeBackgrounds[theme.id] || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
+                                       {gameConfig.themeBackgrounds[theme.id] && (
+                                           <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg">
+                                                {/* [แก้ไข] ใช้ฟังก์ชันแปลงลิงก์ เพื่อให้รูปจาก Drive ขึ้นตัวอย่าง */}
+                                                <img src={getDirectImageLink(gameConfig.themeBackgrounds[theme.id])} alt="p" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                           </div>
+                                       )}
                                    </div>
                                </div>
                            ))}
@@ -312,7 +363,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-600 border border-white/20">
                              {s.profileImage ? (<img src={s.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />) : (<div className="w-full h-full flex items-center justify-center text-[10px]">{s.id}</div>)}
                            </div>
-                           <div><span className="font-bold">No. {s.id}</span> {s.firstName}</div>
+                           <div><span className="font-bold">No.{s.id}</span> {s.firstName}</div>
                         </div>
                         <ChevronRight size={16} />
                       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { UserRole, StudentProfile } from '../types';
 import { StorageService } from '../services/storage';
-import { User, Star, GraduationCap, Plus, Divide, Calculator, Infinity, Pi, Sigma, Sparkles } from 'lucide-react';
+import { User, Star, GraduationCap, Plus, Divide, Calculator, Infinity, Pi, Sigma, Sparkles, Zap } from 'lucide-react';
 
 // --- รวม Animation ทั้งหมดไว้ตรงนี้ ---
 const customStyles = `
@@ -35,6 +35,12 @@ const customStyles = `
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+/* 6. เอฟเฟคแสงวาบ (Flash) */
+@keyframes flash-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,255,0,0.8)); }
 }
 `;
 
@@ -88,7 +94,6 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
       <div className="flex flex-col md:flex-row gap-6 w-full max-w-5xl z-10 py-10 md:items-stretch">
           
           {/* --- กล่องหลัก (Main Container) --- */}
-          {/* ใช้ Wrapper div เพื่อสร้างเลเยอร์แสงด้านหลัง */}
           <div className="relative flex-1 animate-pop-in group">
             
             {/* 1. เลเยอร์แสงเบลอ (Glowing Border) */}
@@ -101,37 +106,47 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 }}
             ></div>
 
-            {/* 2. กล่องเนื้อหาจริง (อยู่ด้านบนเลเยอร์แสง) */}
+            {/* 2. กล่องเนื้อหาจริง */}
             <div className="relative bg-slate-800/95 backdrop-blur-xl p-6 md:p-10 rounded-[40px] shadow-2xl h-full border border-white/10">
                 
-                {/* --- ส่วนหัวข้อเกมสุดอลังการ --- */}
-                <div className="text-center mb-8 relative z-10">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-40 bg-blue-500/30 blur-[50px] rounded-full animate-pulse"></div>
+                {/* --- ส่วนหัวข้อเกมสุดอลังการ (ปรับปรุงใหม่) --- */}
+                <div className="text-center mb-6 relative z-10">
+                    {/* แสงด้านหลังชื่อ */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-48 bg-blue-500/40 blur-[60px] rounded-full animate-pulse"></div>
                     
                     <div className="relative inline-block" style={{ animation: 'float-title 3s ease-in-out infinite' }}>
-                        <Sparkles className="absolute -top-6 -left-8 text-yellow-300 w-10 h-10" style={{ animation: 'spin-sparkle 2s infinite' }} />
-                        <Sparkles className="absolute -bottom-4 -right-8 text-white w-8 h-8" style={{ animation: 'spin-sparkle 2s infinite 1s' }} />
+                        {/* ไอคอนตกแต่งรอบๆ */}
+                        <Sparkles className="absolute -top-8 -left-10 text-yellow-300 w-12 h-12" style={{ animation: 'spin-sparkle 2s infinite' }} />
+                        <Sparkles className="absolute -bottom-2 -right-10 text-white w-10 h-10" style={{ animation: 'spin-sparkle 2.5s infinite 1s' }} />
+                        <Zap className="absolute top-0 -right-8 text-cyan-300 w-8 h-8 rotate-12 animate-bounce" />
 
+                        {/* ชื่อเกมหลัก: เพิ่ม leading-[1.6] และ py-6 เพื่อให้สระอุไม่ขาด */}
                         <h1 
-                            className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-500 to-cyan-400 drop-shadow-xl py-8 leading-[2]" 
+                            className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-cyan-400 drop-shadow-2xl py-6 leading-[1.6] tracking-tighter" 
                             style={{ 
                                 backgroundImage: 'linear-gradient(to right, #fbbf24, #f472b6, #22d3ee, #fbbf24)', 
                                 backgroundSize: '200% auto',
-                                animation: 'text-shine 3s linear infinite',
-                                filter: 'drop-shadow(0px 4px 0px rgba(0,0,0,0.5))',
-                                WebkitTextStroke: '2px white',
+                                animation: 'text-shine 3s linear infinite, flash-glow 3s infinite',
+                                filter: 'drop-shadow(0px 6px 0px rgba(0,0,0,0.5))',
+                                WebkitTextStroke: '2.5px white',
                             }}
                         >
                             คิดเลขสนุก
                         </h1>
                         
-                        <div className="mt-[-10px] transform -rotate-2">
-                            <span className="bg-white text-slate-900 text-lg md:text-2xl font-black px-4 py-1 rounded-full shadow-[4px_4px_0_rgba(0,0,0,0.2)] border-2 border-slate-900 inline-block">
-                                BY ครูแบ็ค
-                            </span>
+                        {/* ชื่อครู: ปรับ mt เป็น -2px (ห่างขึ้น) และขนาดตัวอักษรเท่าเดิม */}
+                        <div className="mt-[-2px] transform -rotate-2 relative z-20">
+                            <div className="inline-block relative">
+                                {/* แสงรองหลังป้ายชื่อครู */}
+                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full"></div>
+                                <span className="relative bg-white text-slate-900 text-lg md:text-2xl font-black px-6 py-1 rounded-full shadow-[4px_4px_0_rgba(0,0,0,0.3)] border-4 border-slate-900 inline-block tracking-tight">
+                                    by ครูแบ็ค
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
+                {/* ------------------------------------------- */}
                 
                 <div className="flex bg-slate-700/50 rounded-2xl p-1 mb-8 border border-slate-600">
                     <button onClick={() => setActiveTab('STUDENT')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === 'STUDENT' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>นักเรียน</button>
