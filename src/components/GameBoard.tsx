@@ -330,16 +330,24 @@ export const GameBoard: React.FC<Props> = ({
                     const tile = tiles[Math.min(p.position, tiles.length-1)]; 
                     if (!tile) return null; 
                     return (
-                        <div key={i} className={`absolute w-[7%] md:w-[5%] aspect-square -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out drop-shadow-2xl ${isMoving && localCurrentIndex === i ? 'animate-hop' : ''}`} style={{ left: `${tile.x}%`, top: `${tile.y - 5}%` }}>
-                            {p.profileImage ? (
-                                <img src={p.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-lg object-cover" referrerPolicy="no-referrer" alt="Player" />
-                            ) : (
-                                <CharacterSvg 
-                                    type={(p.appearance?.base === 'BOY' ? theme.player1Char : theme.player2Char) as CharacterType} 
-                                    className="w-full h-full filter drop-shadow-lg" 
-                                    appearance={p.appearance}
-                                />
-                            )}
+                        <div 
+                            key={i} 
+                            // [กล่องนอก] รับผิดชอบแค่การ "เลื่อนตำแหน่ง" (Slide)
+                            className="absolute w-[7%] md:w-[5%] aspect-square -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out" 
+                            style={{ left: `${tile.x}%`, top: `${tile.y - 5}%` }}
+                        >
+                            {/* [กล่องใน] รับผิดชอบการ "กระโดด" (Bounce) */}
+                            <div className={`w-full h-full drop-shadow-2xl ${isMoving && localCurrentIndex === i ? 'animate-bounce' : ''}`}>
+                                {p.profileImage ? (
+                                    <img src={p.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-lg object-cover" referrerPolicy="no-referrer" alt="Player" />
+                                ) : (
+                                    <CharacterSvg 
+                                        type={(p.appearance?.base === 'BOY' ? theme.player1Char : theme.player2Char) as CharacterType} 
+                                        className="w-full h-full filter drop-shadow-lg" 
+                                        appearance={p.appearance}
+                                    />
+                                )}
+                            </div>
                         </div>
                     ); 
                 })}
@@ -407,7 +415,7 @@ export const GameBoard: React.FC<Props> = ({
                     </button>
                 </div>
            </div>
-      </div>ฟ
+      </div>
 
       <MathModal question={activeQuestion} onAnswer={handleAnswer} volume={sfxVolume} calculatorUsesLeft={currentPlayer?.calculatorUsesLeft || 0} onConsumeCalculator={handleConsumeCalculator} />
       {activeOverlay && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-pop-in" onClick={() => !isMoving && activeOverlay.type !== 'WIN' && resumeMove()}><div className="bg-slate-800 p-8 rounded-3xl border-4 border-white text-center shadow-2xl max-w-sm"><div className="text-7xl mb-4 animate-bounce">{activeOverlay.type === 'TREASURE' ? '💎' : '🕸️'}</div><h2 className="text-2xl font-black text-white mb-2">{activeOverlay.msg}</h2></div></div>)}
