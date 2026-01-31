@@ -130,14 +130,28 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
-       <header className="flex-none bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center z-10">
-          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">ระบบจัดการคุณครู</h1>
-          <div className="flex gap-4">
-             <button onClick={() => setActiveTab('REPORTS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>ผลการเรียน</button>
-             <button onClick={() => setActiveTab('QUESTIONS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>จัดการโจทย์</button>
-             <button onClick={() => setActiveTab('ASSETS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>ตั้งค่าเกม</button>
-             <button onClick={() => setActiveTab('STUDENTS')} className={`px-4 py-2 rounded-lg font-bold transition ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>รายชื่อนักเรียน</button>
-             <button onClick={onLogout} className="text-red-400 hover:text-white flex items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20"><LogOut size={18}/> ออก</button>
+       <header className="flex-none bg-slate-800 p-4 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
+          {/* ส่วนบน: หัวข้อ + ปุ่มออก (สำหรับมือถือ) */}
+          <div className="flex justify-between items-center w-full md:w-auto">
+              <h1 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">ระบบจัดการคุณครู</h1>
+              
+              {/* [แก้ไข] ปุ่มออก (แสดงเฉพาะมือถือ) อยู่มุมขวาบน กดง่าย */}
+              <button onClick={onLogout} className="md:hidden text-red-400 hover:text-white flex items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 bg-slate-900/50">
+                  <LogOut size={18}/> <span className="text-sm font-bold">ออก</span>
+              </button>
+          </div>
+
+          {/* ส่วนล่าง: เมนูแท็บ (เลื่อนแนวนอนได้ในมือถือ) + ปุ่มออก (สำหรับคอม) */}
+          <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto overflow-x-auto md:overflow-visible pb-2 md:pb-0 custom-scrollbar">
+             <button onClick={() => setActiveTab('REPORTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ผลการเรียน</button>
+             <button onClick={() => setActiveTab('QUESTIONS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>จัดการโจทย์</button>
+             <button onClick={() => setActiveTab('ASSETS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ตั้งค่าเกม</button>
+             <button onClick={() => setActiveTab('STUDENTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>รายชื่อนักเรียน</button>
+             
+             {/* [แก้ไข] ปุ่มออก (แสดงเฉพาะคอมพิวเตอร์) */}
+             <button onClick={onLogout} className="hidden md:flex text-red-400 hover:text-white items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 whitespace-nowrap ml-auto">
+                <LogOut size={18}/> ออก
+             </button>
           </div>
        </header>
 
