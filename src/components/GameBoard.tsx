@@ -3,7 +3,7 @@ import type { PlayerState, TileType, MathQuestion, ThemeConfig, TileConfig, Ques
 import { StorageService } from '../services/storage'; 
 import { CharacterSvg } from './CharacterSvg';
 import { MathModal } from './MathModal';
-import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, PlayCircle } from 'lucide-react';
+import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, PlayCircle, Dices, Footprints } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -97,6 +97,8 @@ export const GameBoard: React.FC<Props> = ({
   const [isSpinning, setIsSpinning] = useState(false);
   const [displayNumber, setDisplayNumber] = useState(1);
   const [trapBackSteps, setTrapBackSteps] = useState(0);
+  // [เพิ่มใหม่] ตัวแปรเช็คว่ากำลังจะจบเทิร์น (เอาไว้หน่วงเวลาให้ปุ่มแดงค้าง)
+  const [isFinishingTurn, setIsFinishingTurn] = useState(false);
   
   const spinIntervalRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -187,7 +189,25 @@ export const GameBoard: React.FC<Props> = ({
       audio.play().catch(()=>{}); 
   };
 
-  const handleAction = () => { if (gameFinished || isSpinning || isMoving || activeQuestion || activeOverlay) return; if (pendingSteps > 0) { resumeMove(); return; } setIsSpinning(true); spinIntervalRef.current = setInterval(() => setDisplayNumber(Math.floor(Math.random() * 6) + 1), 50); setTimeout(() => { if(spinIntervalRef.current) clearInterval(spinIntervalRef.current); const result = Math.floor(Math.random() * 6) + 1; setDisplayNumber(result); setIsSpinning(false); setTimeout(() => startMove(result), 800); }, 1500); };
+  const handleAction = () => { 
+      if (gameFinished || isSpinning || isMoving || activeQuestion || activeOverlay) return;
+      if (pendingSteps > 0) { resumeMove(); return; } 
+      
+      setIsSpinning(true); 
+      spinIntervalRef.current = setInterval(() => setDisplayNumber(Math.floor(Math.random() * 6) + 1), 50);
+      
+      setTimeout(() => { 
+          if(spinIntervalRef.current) clearInterval(spinIntervalRef.current); 
+          const result = Math.floor(Math.random() * 6) + 1; 
+          setDisplayNumber(result); 
+          
+          // [แก้ไข] ย้าย setIsSpinning(false) เข้ามาไว้ใน Timeout เพื่อเชื่อมต่อกับ startMove ไม่ให้มีช่องว่างปุ่มฟ้า
+          setTimeout(() => { 
+              setIsSpinning(false); 
+              startMove(result); 
+          }, 500); 
+      }, 1500);
+  };
   const startMove = (steps: number) => moveOneStep(steps, playersRef.current[localCurrentIndex].position);
   const moveOneStep = (stepsRemaining: number, currentPos: number) => { if (stepsRemaining <= 0) { setIsMoving(false); const tile = tiles[currentPos]; if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); else if (tile?.type === 'QUESTION' && pendingSteps === 0) handleTileEvent('QUESTION'); else endTurn(); return; } setIsMoving(true); playSfx(SFX.STEP); const nextPos = Math.min(currentPos + 1, tiles.length - 1); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; setLocalPlayers(newPlayers); onTurnComplete(newPlayers, localCurrentIndex); setTimeout(() => { const tile = tiles[nextPos]; if (tile?.type === 'FINISH') { setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; } if (tile?.type === 'QUESTION') { setIsMoving(false); setPendingSteps(stepsRemaining - 1); handleTileEvent('QUESTION'); return; } if (tile?.type === 'TRAP' && stepsRemaining === 1) { setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; } moveOneStep(stepsRemaining - 1, nextPos); }, 500); };
   
@@ -204,8 +224,56 @@ export const GameBoard: React.FC<Props> = ({
       else if (type === 'TRAP') { const back = Math.floor(Math.random() * 3) + 1; setTrapBackSteps(back); setActiveOverlay({ type: 'TRAP', msg: `โดนกับดัก! ถอยหลัง ${back} ช่อง` }); } 
   };
   
-  const resumeMove = () => { const isTrap = activeOverlay?.type === 'TRAP'; const currentPos = playersRef.current[localCurrentIndex].position; setActiveOverlay(null); setActiveQuestion(null); if (isTrap) { const backPos = Math.max(0, currentPos - trapBackSteps); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex].position = backPos; setLocalPlayers(newPlayers); setTimeout(endTurn, 500); return; } if (pendingSteps > 0) { const steps = pendingSteps; setPendingSteps(0); setTimeout(() => moveOneStep(steps, playersRef.current[localCurrentIndex].position), 500); } else endTurn(); };
-  const endTurn = () => { const nextIndex = (localCurrentIndex + 1) % localPlayers.length; setLocalCurrentIndex(nextIndex); setDisplayNumber(1); };
+  const resumeMove = () => { 
+      const isTrap = activeOverlay?.type === 'TRAP'; 
+      const currentPos = playersRef.current[localCurrentIndex].position; 
+      
+      // ปิดหน้าต่างแจ้งเตือน/โจทย์
+      setActiveOverlay(null); 
+      setActiveQuestion(null); 
+      
+      // [แก้ไข] สั่ง isMoving=true ทันที เพื่อ "เลี้ยงสถานะปุ่มแดง" ไว้ช่วงรอ Delay
+      setIsMoving(true); 
+
+      if (isTrap) { 
+          const backPos = Math.max(0, currentPos - trapBackSteps); 
+          const newPlayers = [...playersRef.current]; 
+          newPlayers[localCurrentIndex].position = backPos; 
+          setLocalPlayers(newPlayers); 
+          
+          // รอสักพักค่อยจบเทิร์น (ปุ่มจะแดงตลอดช่วงนี้เพราะ isMoving=true)
+          setTimeout(() => {
+              setIsMoving(false); // หยุดสถานะเดิน
+              endTurn();
+          }, 500); 
+          return; 
+      } 
+      
+      if (pendingSteps > 0) { 
+          const steps = pendingSteps;
+          setPendingSteps(0); 
+          setTimeout(() => moveOneStep(steps, playersRef.current[localCurrentIndex].position), 500); 
+      } else { 
+          // [แก้ไข] ต้องปิดสถานะเดินก่อน ไม่งั้นปุ่มจะค้างเป็นสีแดงตลอดไป
+          setIsMoving(false); 
+          endTurn();
+      }
+  };
+  // [แก้ไข] endTurn แบบหน่วงเวลา 0.8 วินาที
+  const endTurn = () => { 
+      // 1. สั่งให้สถานะ "กำลังจบ" ทำงาน (เพื่อให้ปุ่มยังเป็นสีแดงอยู่)
+      setIsFinishingTurn(true); 
+
+      // 2. รอ 0.8 วินาที (800 ms)
+      setTimeout(() => {
+          setIsFinishingTurn(false); // ปิดสถานะ "กำลังจบ" (ปุ่มกลับเป็นสีฟ้า)
+          
+          // เปลี่ยนเทิร์น (ถึงเล่นคนเดียว สูตรนี้ก็ใช้ได้ครับ มันจะวนกลับมาที่ตัวเองอัตโนมัติ)
+          const nextIndex = (localCurrentIndex + 1) % localPlayers.length; 
+          setLocalCurrentIndex(nextIndex); 
+          setDisplayNumber(1); 
+      }, 800); 
+  };
   
   const handleAnswer = (correct: boolean, usedCalculator: boolean) => { 
       if (activeQuestion) { 
@@ -290,8 +358,56 @@ export const GameBoard: React.FC<Props> = ({
                </div>
                <div className="text-left md:text-center overflow-hidden min-w-0"><h1 className="text-sm md:text-2xl font-black text-white truncate">{currentPlayer?.nickname || currentPlayer?.firstName}</h1><div className="hidden md:block bg-slate-800/80 w-full p-3 rounded-xl border border-slate-600 mt-3"><div className="text-xs text-slate-400 uppercase">คะแนนสะสม</div><div className="text-5xl font-black text-yellow-400">{currentPlayer?.score}</div></div><div className="md:hidden text-yellow-400 font-black text-sm">⭐ {currentPlayer?.score} คะแนน</div></div>
            </div>
-           <div className="w-[50%] md:w-full flex justify-end md:justify-center pl-2"><div className="bg-black/20 p-2 md:p-4 rounded-xl md:rounded-3xl border-2 md:border-4 border-slate-600 shadow-xl group flex flex-row md:flex-col items-center gap-2 md:gap-4 w-full"><div className="bg-slate-800 w-12 h-10 md:w-full md:h-24 rounded-lg md:rounded-xl flex items-center justify-center border-2 border-slate-600 relative shrink-0"><span className={`text-2xl md:text-6xl font-black font-mono relative z-10 ${isSpinning ? 'text-white blur-[1px]' : 'text-green-400'}`}>{displayNumber}</span></div><button onClick={(e) => { e.stopPropagation(); handleAction(); }} className={`flex-1 py-2 md:py-4 rounded-lg md:rounded-xl text-white font-black text-sm md:text-xl shadow-lg active:scale-95 transition-all ${pendingSteps > 0 ? 'bg-orange-500 animate-pulse' : 'bg-blue-600 hover:bg-blue-500'} whitespace-nowrap`}>{pendingSteps > 0 ? `เดิน (${pendingSteps})` : isSpinning ? '...' : 'สุ่มตัวเลข'}</button></div></div>
-      </div>
+           {/* ส่วนปุ่มสุ่มตัวเลขแบบใหม่ (3D + Logic สีแดงค้างจนกว่าจะหยุดเดิน) */}
+           {/* ส่วนปุ่มสุ่มตัวเลขแบบใหม่ (แก้ไข Logic ให้แดงต่อเนื่องทุกสถานะ) */}
+           <div className="w-[50%] md:w-full flex justify-end md:justify-center pl-2">
+                <div className="bg-slate-800/40 p-3 rounded-2xl border-2 border-slate-600/50 shadow-xl backdrop-blur-sm flex flex-row md:flex-col items-center gap-4">
+                    
+                    {/* จอแสดงผลตัวเลข */}
+                    <div className="bg-slate-900 w-16 h-12 md:w-full md:h-24 rounded-xl flex items-center justify-center border-2 border-slate-600 relative shadow-inner">
+                        <span className={`text-3xl md:text-6xl font-black font-mono ${isSpinning ? 'text-white/50 blur-[1px]' : 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]'}`}>
+                            {displayNumber}
+                        </span>
+                    </div>
+
+                    {/* ปุ่มกด 3D */}
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleAction(); }} 
+                        // ห้ามกดซ้ำถ้า: หมุน / เดิน / มีแต้มค้าง / จบเทิร์น / ทำโจทย์อยู่ / หรือมีข้อความขึ้น (สมบัติ/กับดัก)
+                        disabled={isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null}
+                        className={`
+                            relative group transition-all duration-100 ease-in-out
+                            w-20 h-20 md:w-24 md:h-24 rounded-full 
+                            flex items-center justify-center shrink-0
+                            border-b-[6px] active:border-b-0 active:translate-y-[6px] active:shadow-none
+                            shadow-xl hover:scale-105
+                            ${(isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) 
+                                ? 'bg-gradient-to-b from-red-500 to-red-600 border-red-800' // สถานะไม่ว่าง (แดง)
+                                : 'bg-gradient-to-b from-blue-400 to-blue-600 border-blue-800' // ว่าง (ฟ้า)
+                            }
+                        `}
+                    >
+                        {/* ไอคอนภายในปุ่ม */}
+                        <div className="drop-shadow-md text-white">
+                            {isSpinning ? (
+                                <Dices className="animate-spin" size={32} /> // 1. กำลังหมุน -> ลูกเต๋า
+                            ) : (isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) ? (
+                                <Footprints className="animate-bounce" size={32} /> // 2. ไม่ว่าง (เดิน/โจทย์/ข้อความ) -> รอยเท้า
+                            ) : (
+                                <span className="font-black text-2xl">สุ่ม</span> // 3. ว่าง -> ข้อความ
+                            )}
+                        </div>
+                        
+                        {/* ตัวเลขแจ้งเตือนจำนวนช่อง (Badge) */}
+                        {pendingSteps > 0 && (
+                            <div className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 border-2 border-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center animate-bounce shadow-md z-10">
+                                {pendingSteps}
+                            </div>
+                        )}
+                    </button>
+                </div>
+           </div>
+      </div>ฟ
 
       <MathModal question={activeQuestion} onAnswer={handleAnswer} volume={sfxVolume} calculatorUsesLeft={currentPlayer?.calculatorUsesLeft || 0} onConsumeCalculator={handleConsumeCalculator} />
       {activeOverlay && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-pop-in" onClick={() => !isMoving && activeOverlay.type !== 'WIN' && resumeMove()}><div className="bg-slate-800 p-8 rounded-3xl border-4 border-white text-center shadow-2xl max-w-sm"><div className="text-7xl mb-4 animate-bounce">{activeOverlay.type === 'TREASURE' ? '💎' : '🕸️'}</div><h2 className="text-2xl font-black text-white mb-2">{activeOverlay.msg}</h2></div></div>)}
