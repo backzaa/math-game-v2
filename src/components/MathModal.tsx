@@ -34,8 +34,16 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH'; 
-        utterance.rate = 1.0; 
-        utterance.volume = 1.0; // [เพิ่ม] สั่งให้เร่งเสียงพูดให้ดังที่สุดเท่าที่จะทำได้
+        
+        // [แก้ไข] ตรวจสอบว่าเป็นมือถือหรือไม่
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // [แก้ไข] ปรับความเร็ว: 
+        // - ถ้าเป็นมือถือ: ความเร็วปกติ (1.0)
+        // - ถ้าเป็นคอมพิวเตอร์: ลดความเร็วลง (0.8) เพื่อให้ฟังชัดขึ้น
+        utterance.rate = isMobile ? 1.0 : 0.8; 
+        
+        utterance.volume = 1.0; // คงค่าเดิม: สั่งให้เร่งเสียงพูดให้ดังที่สุดเท่าที่จะทำได้
 
         const voices = window.speechSynthesis.getVoices();
         const thaiVoice = voices.find(v => v.lang.includes('th') || v.lang.includes('TH'));
