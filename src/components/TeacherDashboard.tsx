@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types';
-import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, CheckCircle2, XCircle, Clock, BarChart } from 'lucide-react';
+import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
@@ -9,15 +9,12 @@ interface Props {
   onUpdateQuestions?: (qs: MathQuestion[]) => void;
 }
 
-// [แก้ไข] ฟังก์ชันแปลงลิงก์ Google Drive เป็น Direct Link แบบ lh3 (แสดงผลไวและชัวร์กว่า)
+// ฟังก์ชันแปลงลิงก์ Google Drive
 const getDirectImageLink = (url: string) => {
     if (!url) return '';
-    // ตรวจสอบว่าเป็นลิงก์ Google Drive หรือไม่ (รองรับทั้ง /file/d/ และ id=)
     if (url.includes('drive.google.com') || url.includes('drive.google.com/file/d/')) {
-        // ดึง ID ด้วย Regex ที่ครอบคลุมกว่าเดิม
         const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
         if (idMatch && idMatch[1]) {
-             // ใช้ lh3.googleusercontent.com/d/ ซึ่งเป็น CDN ตรงของ Google (แสดงภาพได้ทันที)
              return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
         }
     }
@@ -49,20 +46,22 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentForm, setStudentForm] = useState({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE' as Gender, classroom: '', profileImage: '', base: 'BOY' as CharacterBase, skinColor: '#fcd34d' as SkinColor });
 
+  // --- [ส่วนที่เพิ่มใหม่] States สำหรับระบบลบนักเรียน ---
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<StudentProfile | null>(null);
+  const [deleteStep, setDeleteStep] = useState<'CONFIRM' | 'PASSWORD'>('CONFIRM'); // ขั้นตอน: ยืนยัน -> ใส่รหัส
+  const [deletePassword, setDeletePassword] = useState('');
+  // --------------------------------------------------
+
   const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
 
   const loadDataFromLocal = () => {
-      // 1. ดึงนักเรียน
       setStudents(StorageService.getAllStudents());
-      
-      // 2. ดึงการตั้งค่า
       const cfg = StorageService.getGameConfig();
       if(cfg) {
           setGameConfig({ themeBackgrounds: cfg.themeBackgrounds || {}, bgmPlaylist: cfg.bgmPlaylist || [] });
           setBgmInput((cfg.bgmPlaylist || []).join('\n'));
       }
-
-      // 3. ดึงโจทย์
       let currentQs: MathQuestion[] = [];
       if (questionSettingMode === 'CLASSROOM') {
           currentQs = StorageService.getDailyQuestions();
@@ -133,12 +132,10 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
     } catch (error) { alert('เกิดข้อผิดพลาดในการบันทึก'); }
   };
 
-  // [เพิ่มใหม่] ฟังก์ชันบันทึกการตั้งค่า (Assets)
   const handleSaveAssets = () => {
       try {
           const playlist = bgmInput.split('\n').map(s => s.trim()).filter(s => s !== '');
           
-          // แปลงลิงก์พื้นหลังทั้งหมดให้เป็น Direct Link (lh3...) ก่อนบันทึก
           const convertedBackgrounds = { ...gameConfig.themeBackgrounds };
           Object.keys(convertedBackgrounds).forEach(key => {
               convertedBackgrounds[key] = getDirectImageLink(convertedBackgrounds[key]);
@@ -150,8 +147,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
           };
 
           StorageService.saveGameConfig(newConfig);
-          
-          // อัปเดตหน้าจอทันที
           setGameConfig(prev => ({ ...prev, themeBackgrounds: convertedBackgrounds }));
           
           alert('บันทึกการตั้งค่าเรียบร้อยแล้วครับ!');
@@ -165,7 +160,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
     if (!studentForm.id || !studentForm.firstName) return;
     if (isEditingStudent && editingStudentId) StorageService.updateStudent(editingStudentId, { ...studentForm }); 
     else StorageService.registerStudent(studentForm.id, studentForm.firstName, studentForm.lastName, studentForm.nickname, studentForm.gender, studentForm.classroom, studentForm.profileImage || '');
-    setStudentForm({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE', classroom: '', profileImage: '', base: 'BOY', skinColor: '#fcd34d' });
+    setStudentForm({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE', classroom: '', profileImage: '', base: 'BOY' as CharacterBase, skinColor: '#fcd34d' as SkinColor });
     setIsEditingStudent(false); loadDataFromLocal();
   };
 
@@ -174,8 +169,81 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       setIsEditingStudent(true); setEditingStudentId(s.id); setActiveTab('STUDENTS');
   };
 
+  // --- [ส่วนที่เพิ่มใหม่] ฟังก์ชันจัดการการลบ ---
+  const handleClickDelete = (s: StudentProfile) => {
+      setStudentToDelete(s);
+      setDeleteStep('CONFIRM');
+      setDeletePassword('');
+      setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+      // เปลี่ยนไปหน้าใส่รหัสผ่าน
+      setDeleteStep('PASSWORD');
+  };
+
+  const handleFinalDelete = () => {
+      if (deletePassword === 'admin') { // เช็ครหัสผ่านครู (ใช้ admin ตามระบบเดิม)
+          if (studentToDelete) {
+              StorageService.deleteStudent(studentToDelete.id); // ลบจาก Storage
+              loadDataFromLocal(); // โหลดข้อมูลใหม่ทันที
+              setShowDeleteModal(false);
+              setStudentToDelete(null);
+              setDeletePassword('');
+              // alert(`ลบข้อมูลน้อง ${studentToDelete.firstName} เรียบร้อยแล้ว`);
+          }
+      } else {
+          alert('รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่');
+      }
+  };
+  // ------------------------------------------
+
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
+       {/* --- [ส่วนที่เพิ่มใหม่] Modal ยืนยันการลบ --- */}
+       {showDeleteModal && (
+           <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center backdrop-blur-sm animate-pop-in">
+               <div className="bg-slate-800 p-8 rounded-2xl border-4 border-red-500/50 shadow-2xl max-w-md w-full mx-4 text-center">
+                   {deleteStep === 'CONFIRM' ? (
+                       <>
+                           <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                               <AlertTriangle size={40} className="text-red-500" />
+                           </div>
+                           <h2 className="text-2xl font-bold text-white mb-2">ต้องการลบจริงใช่ไหม?</h2>
+                           <p className="text-slate-300 mb-6">
+                               ข้อมูลของ <span className="text-red-400 font-bold text-lg">{studentToDelete?.firstName}</span> จะหายไปทั้งหมด<br/>และไม่สามารถกู้คืนได้
+                           </p>
+                           <div className="flex gap-4">
+                               <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold transition">ยกเลิก</button>
+                               <button onClick={handleConfirmDelete} className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold shadow-lg transition transform active:scale-95">ยืนยันการลบ</button>
+                           </div>
+                       </>
+                   ) : (
+                       <>
+                           <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                               <Lock size={40} className="text-blue-500" />
+                           </div>
+                           <h2 className="text-xl font-bold text-white mb-4">ใส่รหัสผ่านครูเพื่อยืนยัน</h2>
+                           <input 
+                                type="password" 
+                                autoFocus
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleFinalDelete()}
+                                placeholder="รหัสผ่าน..."
+                                className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-center text-xl text-white mb-6 focus:border-blue-500 outline-none"
+                           />
+                           <div className="flex gap-4">
+                               <button onClick={() => setDeleteStep('CONFIRM')} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold transition">ย้อนกลับ</button>
+                               <button onClick={handleFinalDelete} className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold shadow-lg transition transform active:scale-95">ตกลงลบข้อมูล</button>
+                           </div>
+                       </>
+                   )}
+               </div>
+           </div>
+       )}
+       {/* ------------------------------------------ */}
+
        <header className="flex-none bg-slate-800 p-4 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
           <div className="flex justify-between items-center w-full md:w-auto">
               <h1 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">ระบบจัดการคุณครู</h1>
@@ -280,7 +348,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
            <div className="max-w-6xl mx-auto bg-slate-800 p-8 rounded-xl border border-slate-700 animate-pop-in">
                <div className="flex justify-between items-center mb-8">
                    <h2 className="text-2xl font-bold flex items-center gap-2"><Palette/> ตั้งค่าฉากและเสียง</h2>
-                   {/* [แก้ไข] เปลี่ยนข้อความบันทึกอัตโนมัติ เป็นปุ่มกดบันทึกแทน */}
                    <button onClick={handleSaveAssets} className="bg-green-600 px-6 py-2 rounded-xl font-bold hover:bg-green-500 shadow-lg flex items-center gap-2 transition-all active:scale-95"><Save/> บันทึกการตั้งค่า</button>
                </div>
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -294,8 +361,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                        <input type="text" placeholder="URL รูปภาพ (รองรับ Google Drive)" value={gameConfig.themeBackgrounds[theme.id] || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
                                        {gameConfig.themeBackgrounds[theme.id] && (
                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg">
-                                                {/* [แก้ไข] ใช้ฟังก์ชันแปลงลิงก์ เพื่อให้รูปจาก Drive ขึ้นตัวอย่าง */}
-                                                <img src={getDirectImageLink(gameConfig.themeBackgrounds[theme.id])} alt="p" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                <img src={getDirectImageLink(gameConfig.themeBackgrounds[theme.id])} alt="preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                            </div>
                                        )}
                                    </div>
@@ -344,7 +410,11 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                           )}
                           <div><div className="font-bold text-lg">{s.firstName} {s.lastName} ({s.nickname})</div><div className="text-xs text-slate-400 uppercase tracking-widest bg-slate-900/50 px-2 py-0.5 rounded-full w-fit mt-1 border border-slate-600">ห้อง {s.classroom}</div></div>
                         </div>
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button><button onClick={() => { if(confirm(`ยืนยันลบ ${s.firstName}?`)) { StorageService.deleteStudent(s.id); loadDataFromLocal(); } }} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button></div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button>
+                            {/* [แก้ไข] ปุ่มลบเรียกฟังก์ชันใหม่ */}
+                            <button onClick={() => handleClickDelete(s)} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button>
+                        </div>
                       </div>
                     ))}
                   </div>

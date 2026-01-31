@@ -53,9 +53,22 @@ export const StorageService = {
     }
   },
 
-  deleteStudent: (id: string) => {
+  // [แก้ไข] เปลี่ยนเป็น async และเพิ่มคำสั่งส่งไปลบที่ Google Sheet
+  deleteStudent: async (id: string) => {
+    // 1. ลบจาก Local Storage (เพื่อให้หน้าจอลบให้ทันที)
     const students = StorageService.getAllStudents().filter(s => String(Number(s.id)) !== String(Number(id)));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+
+    // 2. ส่งคำสั่งไปลบที่ Google Sheet (เพื่อไม่ให้กลับมาอีกตอนรีโหลด)
+    try { 
+        await fetch(SCRIPT_URL, { 
+            method: 'POST', 
+            mode: 'no-cors', 
+            body: JSON.stringify({ action: 'deleteStudent', id: id }) 
+        });
+    } catch (e) {
+        console.error("Error deleting from cloud:", e);
+    }
   },
 
   saveGameConfig: async (config: GameGlobalConfig) => {
