@@ -322,9 +322,23 @@ export const GameBoard: React.FC<Props> = ({
           <div className="relative w-full h-full max-w-[100vh] max-h-[75vw] md:max-w-[calc(80vw-2rem)] md:max-h-[calc(100vh-2rem)] aspect-[4/3] shadow-2xl rounded-3xl overflow-hidden border-4 border-slate-700/50 backdrop-blur-sm m-4">
                 <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none"><path d={pathD} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1, 3" /><path d={pathD} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 {tiles.map((t, i) => {
-                    const isSpecial = ['QUESTION', 'TREASURE', 'TRAP'].includes(t.type); const isStartFinish = ['START', 'FINISH'].includes(t.type); const sizeClass = isStartFinish ? 'w-[12%] md:w-[10%]' : isSpecial ? 'w-[10%] md:w-[8%]' : 'w-[8%] md:w-[6%]';
+                    const isSpecial = ['QUESTION', 'TREASURE', 'TRAP'].includes(t.type); 
+                    const isStartFinish = ['START', 'FINISH'].includes(t.type); 
+                    const sizeClass = isStartFinish ? 'w-[12%] md:w-[10%]' : isSpecial ? 'w-[10%] md:w-[8%]' : 'w-[8%] md:w-[6%]';
                     const tileStyle = getThemeColors(t.type); 
-                    return (<div key={i} className={`absolute ${sizeClass} aspect-square -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-2xl border-[3px] md:border-4 shadow-[0_4px_0_rgba(0,0,0,0.2)] transition-transform z-10 ${i === currentPlayer?.position ? 'scale-110 ring-4 ring-yellow-300 z-20' : 'scale-100'} ${tileStyle}`} style={{ left: `${t.x}%`, top: `${t.y}%` }}><span className={`font-black ${isSpecial || isStartFinish ? 'text-sm md:text-xl' : 'text-[0.6rem] md:text-[0.7rem] opacity-60'}`}>{t.type === 'START' && 'START'} {t.type === 'FINISH' && 'FINISH'} {t.type === 'QUESTION' && '?'} {t.type === 'TREASURE' && '💎'} {t.type === 'TRAP' && '🕸️'} {!isSpecial && !isStartFinish && i}</span></div>);
+                    
+                    return (
+                        <div key={i} className={`absolute ${sizeClass} aspect-square -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-2xl border-[3px] md:border-4 shadow-[0_4px_0_rgba(0,0,0,0.2)] transition-transform z-10 ${i === currentPlayer?.position ? 'scale-110 ring-4 ring-yellow-300 z-20' : 'scale-100'} ${tileStyle}`} style={{ left: `${t.x}%`, top: `${t.y}%` }}>
+                            {/* [แก้ไข] ลบส่วนแสดงตัวเลขทิ้ง เหลือแค่ไอคอนพิเศษ */}
+                            <span className={`font-black ${isSpecial || isStartFinish ? 'text-sm md:text-xl' : 'hidden'}`}>
+                                {t.type === 'START' && 'START'} 
+                                {t.type === 'FINISH' && 'FINISH'} 
+                                {t.type === 'QUESTION' && '?'} 
+                                {t.type === 'TREASURE' && '💎'} 
+                                {t.type === 'TRAP' && '🕸️'} 
+                            </span>
+                        </div>
+                    );
                 })}
                 {localPlayers.map((p, i) => { 
                     const tile = tiles[Math.min(p.position, tiles.length-1)]; 

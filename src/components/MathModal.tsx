@@ -45,9 +45,13 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
     
     playSound(isCorrect);
     setFeedback({ isCorrect, show: true });
-
-    if (isCorrect) speak("เก่งมาก ถูกต้องครับ");
-    else speak("ไม่เป็นไร เอาใหม่นะ");
+    
+    // [แก้ไข] เพิ่มการพูดเฉลยคำตอบ
+    if (isCorrect) {
+        speak("เก่งมาก ถูกต้องครับ");
+    } else {
+        speak(`ผิดนิดนึง คำตอบคือ ${question.answer} ครับ`); 
+    }
     
     setTimeout(() => {
       onAnswer(isCorrect, usedCalcInThisQuestion);
@@ -55,7 +59,7 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
       setShowCalculator(false);
       setUsedCalcInThisQuestion(false);
       setCalcDisplay('0');
-    }, 2000);
+    }, 3000); // [แนะนำ] เพิ่มเวลาโชว์เป็น 3 วินาที (3000) จะได้อ่านเฉลยทัน
   };
 
   const activateCalculator = () => {
@@ -91,7 +95,14 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
               ) : (
                 <>
                   <XCircle size={140} className="text-white animate-pulse" />
-                   <div><h2 className="text-6xl font-black text-white drop-shadow-lg mb-2">ผิดนิดนึง</h2></div>
+                  <div><h2 className="text-6xl font-black text-white drop-shadow-lg mb-2">ผิดนิดนึง</h2></div>
+                  
+                  {/* [เพิ่มใหม่] ส่วนแสดงเฉลยคำตอบ */}
+                  <div className="bg-white/20 px-6 py-2 rounded-xl backdrop-blur-sm mt-2 mb-4 border-2 border-white/30">
+                      <p className="text-xl text-slate-200">คำตอบที่ถูกคือ</p>
+                      <p className="text-5xl font-black text-yellow-300 drop-shadow-md">{question.answer}</p>
+                  </div>
+
                   <Frown size={60} className="text-slate-200" />
                 </>
               )}
