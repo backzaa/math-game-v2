@@ -31,9 +31,19 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
   const speak = (text: string) => {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH'; 
         utterance.rate = 1.0; 
+        utterance.volume = 1.0; // [เพิ่ม] สั่งให้เร่งเสียงพูดให้ดังที่สุดเท่าที่จะทำได้
+
+        const voices = window.speechSynthesis.getVoices();
+        const thaiVoice = voices.find(v => v.lang.includes('th') || v.lang.includes('TH'));
+        
+        if (thaiVoice) {
+            utterance.voice = thaiVoice;
+        }
+
         window.speechSynthesis.speak(utterance);
     }
   };

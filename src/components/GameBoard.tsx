@@ -67,8 +67,14 @@ export const GameBoard: React.FC<Props> = ({
   const getDirectImageLink = (url: string) => { if (!url) return ''; if (url.includes('drive.google.com') && url.includes('/d/')) { const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (idMatch && idMatch[1]) return `https://lh3.googleusercontent.com/d/${idMatch[1]}`; } return url; };
   const getGradientStyle = () => { switch(currentThemeKey) { case 'space': return 'radial-gradient(circle at center, #1e293b 0%, #000000 100%)'; case 'jungle': return 'linear-gradient(to bottom, #14532d, #064e3b)'; case 'ocean': return 'linear-gradient(180deg, #0e7490 0%, #164e63 100%)'; case 'boat': return 'linear-gradient(to bottom, #38bdf8, #0ea5e9, #fde047)'; case 'volcano': return 'linear-gradient(to top, #450a0a, #7f1d1d)'; case 'candy': return 'radial-gradient(circle, #fbcfe8 0%, #db2777 100%)'; case 'castle': return 'linear-gradient(to bottom, #334155, #1e293b)'; default: return 'linear-gradient(to bottom, #475569, #334155)'; } };
   
-  const [bgmVolume, setBgmVolume] = useState(0.8);
-  const [sfxVolume, setSfxVolume] = useState(0.4);
+  // ฟังก์ชันเช็คว่าเป็น มือถือ หรือ แท็บเล็ต (ครอบคลุม iPad และ Android Tablet)
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+  };
+
+  // ถ้าเป็นคอมพิวเตอร์ ให้ลดเสียงลง 30% (คูณ 0.7) ถ้าเป็นมือถือ/แท็บเล็ต ใช้เสียงเดิม
+  const [bgmVolume, setBgmVolume] = useState(isMobileDevice() ? 0.8 : (0.8 * 0.7));
+  const [sfxVolume, setSfxVolume] = useState(isMobileDevice() ? 0.4 : (0.4 * 0.7));
   const [showSettings, setShowSettings] = useState(false);
   const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [activeAssets, setActiveAssets] = useState<{ bg: string | null, bgmPlaylist: string[] }>({ bg: null, bgmPlaylist: [] });
