@@ -74,7 +74,7 @@ export const GameBoard: React.FC<Props> = ({
 
   // ถ้าเป็นคอมพิวเตอร์ ให้ลดเสียงลง 30% (คูณ 0.7) ถ้าเป็นมือถือ/แท็บเล็ต ใช้เสียงเดิม
   const [bgmVolume, setBgmVolume] = useState(isMobileDevice() ? 0.8 : (0.8 * 0.7));
-  const [sfxVolume, setSfxVolume] = useState(isMobileDevice() ? 0.3 : (0.4 * 0.7));
+  const [sfxVolume, setSfxVolume] = useState(isMobileDevice() ? 0.3 : (0.3 * 0.7));
   const [showSettings, setShowSettings] = useState(false);
   const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [activeAssets, setActiveAssets] = useState<{ bg: string | null, bgmPlaylist: string[] }>({ bg: null, bgmPlaylist: [] });
