@@ -78,10 +78,27 @@ export const StorageService = {
 
   getGameConfig: () => { const data = localStorage.getItem(GAME_CONFIG_KEY); return data ? JSON.parse(data) : null; },
 
-  deleteSession: (sid: string, sessId: string) => {
+  // [แก้ไข] ลบคะแนนจริง ทั้งในเครื่องและ Google Sheet
+  deleteSession: async (sid: string, sessId: string) => {
+    // 1. ลบจาก Local Storage ทันที
     const all = StorageService.getAllStudents();
     const idx = all.findIndex(s => String(Number(s.id)) === String(Number(sid)));
-    if (idx !== -1) { all[idx].sessions = all[idx].sessions.filter(s => s.sessionId !== sessId); localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); }
+    
+    if (idx !== -1) { 
+        all[idx].sessions = all[idx].sessions.filter(s => s.sessionId !== sessId);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); 
+        
+        // 2. ส่งคำสั่งไปลบที่ Google Sheet
+        try { 
+            await fetch(SCRIPT_URL, { 
+                method: 'POST', 
+                mode: 'no-cors', 
+                body: JSON.stringify({ action: 'deleteScore', studentId: sid, sessionId: sessId }) 
+            });
+        } catch (e) {
+            console.error("Error deleting score:", e);
+        }
+    }
   },
 
   addSession: async (id: string, sess: GameSession) => {

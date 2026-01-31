@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types';
-import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock } from 'lucide-react';
+import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
@@ -46,12 +46,17 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentForm, setStudentForm] = useState({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE' as Gender, classroom: '', profileImage: '', base: 'BOY' as CharacterBase, skinColor: '#fcd34d' as SkinColor });
 
-  // --- [ส่วนที่เพิ่มใหม่] States สำหรับระบบลบนักเรียน ---
+  // --- [ส่วนที่แก้ไข] States สำหรับระบบลบ (รองรับทั้งนักเรียนและคะแนน) ---
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [studentToDelete, setStudentToDelete] = useState<StudentProfile | null>(null);
-  const [deleteStep, setDeleteStep] = useState<'CONFIRM' | 'PASSWORD'>('CONFIRM'); // ขั้นตอน: ยืนยัน -> ใส่รหัส
+  const [deleteType, setDeleteType] = useState<'STUDENT' | 'SESSION'>('STUDENT'); // เช็คว่ากำลังลบอะไร
+  const [studentToDelete, setStudentToDelete] = useState<StudentProfile | null>(null); // เก็บข้อมูลนักเรียนที่จะลบ
+  const [sessionToDelete, setSessionToDelete] = useState<{sid: string, sessId: string} | null>(null); // เก็บข้อมูลคะแนนที่จะลบ
+  const [deleteStep, setDeleteStep] = useState<'CONFIRM' | 'PASSWORD'>('CONFIRM');
   const [deletePassword, setDeletePassword] = useState('');
-  // --------------------------------------------------
+  // -------------------------------------------------------------------
+
+  // State สำหรับเก็บว่ากำลังเปิดดูรายละเอียดของรอบเล่นไหนอยู่
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
   const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
 
@@ -72,6 +77,15 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   };
 
   useEffect(() => { loadDataFromLocal(); }, [activeTab, questionSettingMode]);
+
+  const toggleSessionDetails = (sessionId: string) => {
+      setExpandedSessions(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(sessionId)) newSet.delete(sessionId);
+          else newSet.add(sessionId);
+          return newSet;
+      });
+  };
 
   const handleGenerateRandom = () => { 
       const generated: MathQuestion[] = [];
@@ -169,38 +183,62 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       setIsEditingStudent(true); setEditingStudentId(s.id); setActiveTab('STUDENTS');
   };
 
-  // --- [ส่วนที่เพิ่มใหม่] ฟังก์ชันจัดการการลบ ---
-  const handleClickDelete = (s: StudentProfile) => {
+  // --- [ส่วนที่แก้ไข] ฟังก์ชันจัดการการลบ 2 แบบ (นักเรียน / คะแนน) ---
+  
+  // 1. กดลบนักเรียน
+  const handleClickDeleteStudent = (s: StudentProfile) => {
+      setDeleteType('STUDENT');
       setStudentToDelete(s);
       setDeleteStep('CONFIRM');
       setDeletePassword('');
       setShowDeleteModal(true);
   };
 
+  // 2. กดลบคะแนน
+  const handleClickDeleteSession = (sid: string, sessId: string, e: React.MouseEvent) => {
+      e.stopPropagation(); // หยุดไม่ให้ไปกดโดน Dropdown
+      setDeleteType('SESSION');
+      setSessionToDelete({ sid, sessId });
+      setDeleteStep('CONFIRM');
+      setDeletePassword('');
+      setShowDeleteModal(true);
+  };
+
   const handleConfirmDelete = () => {
-      // เปลี่ยนไปหน้าใส่รหัสผ่าน
       setDeleteStep('PASSWORD');
   };
 
   const handleFinalDelete = () => {
-      if (deletePassword === 'admin') { // เช็ครหัสผ่านครู (ใช้ admin ตามระบบเดิม)
-          if (studentToDelete) {
-              StorageService.deleteStudent(studentToDelete.id); // ลบจาก Storage
-              loadDataFromLocal(); // โหลดข้อมูลใหม่ทันที
-              setShowDeleteModal(false);
-              setStudentToDelete(null);
-              setDeletePassword('');
-              // alert(`ลบข้อมูลน้อง ${studentToDelete.firstName} เรียบร้อยแล้ว`);
+      if (deletePassword === 'admin') {
+          if (deleteType === 'STUDENT' && studentToDelete) {
+              // ลบนักเรียน
+              StorageService.deleteStudent(studentToDelete.id);
+              // รีเซ็ตค่าหากลบคนที่เลือกอยู่
+              if (selectedStudent?.id === studentToDelete.id) setSelectedStudent(null);
+          } else if (deleteType === 'SESSION' && sessionToDelete) {
+              // ลบคะแนน
+              StorageService.deleteSession(sessionToDelete.sid, sessionToDelete.sessId);
+              // อัปเดต selectedStudent เพื่อให้หน้าจอรีเฟรชคะแนนทันที
+              if (selectedStudent) {
+                  const updatedStudent = StorageService.getStudent(selectedStudent.id);
+                  if (updatedStudent) setSelectedStudent(updatedStudent);
+              }
           }
+          
+          loadDataFromLocal();
+          setShowDeleteModal(false);
+          setStudentToDelete(null);
+          setSessionToDelete(null);
+          setDeletePassword('');
       } else {
           alert('รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่');
       }
   };
-  // ------------------------------------------
+  // -----------------------------------------------------------
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
-       {/* --- [ส่วนที่เพิ่มใหม่] Modal ยืนยันการลบ --- */}
+       {/* Modal ยืนยันการลบ (ใช้ร่วมกันทั้งลบนักเรียนและลบคะแนน) */}
        {showDeleteModal && (
            <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center backdrop-blur-sm animate-pop-in">
                <div className="bg-slate-800 p-8 rounded-2xl border-4 border-red-500/50 shadow-2xl max-w-md w-full mx-4 text-center">
@@ -211,7 +249,11 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            </div>
                            <h2 className="text-2xl font-bold text-white mb-2">ต้องการลบจริงใช่ไหม?</h2>
                            <p className="text-slate-300 mb-6">
-                               ข้อมูลของ <span className="text-red-400 font-bold text-lg">{studentToDelete?.firstName}</span> จะหายไปทั้งหมด<br/>และไม่สามารถกู้คืนได้
+                               {deleteType === 'STUDENT' ? (
+                                   <>ข้อมูลของ <span className="text-red-400 font-bold text-lg">{studentToDelete?.firstName}</span> จะหายไปทั้งหมด<br/>และไม่สามารถกู้คืนได้</>
+                               ) : (
+                                   <>ประวัติการเล่นรอบนี้จะถูกลบถาวร<br/>และไม่สามารถกู้คืนได้</>
+                               )}
                            </p>
                            <div className="flex gap-4">
                                <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold transition">ยกเลิก</button>
@@ -242,7 +284,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                </div>
            </div>
        )}
-       {/* ------------------------------------------ */}
 
        <header className="flex-none bg-slate-800 p-4 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
           <div className="flex justify-between items-center w-full md:w-auto">
@@ -412,8 +453,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                         </div>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button>
-                            {/* [แก้ไข] ปุ่มลบเรียกฟังก์ชันใหม่ */}
-                            <button onClick={() => handleClickDelete(s)} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button>
+                            {/* ปุ่มลบนักเรียน เรียกใช้ฟังก์ชัน handleClickDeleteStudent */}
+                            <button onClick={() => handleClickDeleteStudent(s)} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button>
                         </div>
                       </div>
                     ))}
@@ -453,8 +494,9 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                       <div className="space-y-6">
                         {selectedStudent.sessions && selectedStudent.sessions.filter(s => s.mode === reportMode).length > 0 ? (
                           selectedStudent.sessions.filter(s => s.mode === reportMode).slice().reverse().map((sess, idx) => (
-                            <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden shadow-lg hover:border-blue-500/30 transition">
-                               <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700">
+                            <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden shadow-lg transition hover:border-blue-500/30">
+                               {/* ส่วนหัวข้อเป็นปุ่มกด Dropdown */}
+                               <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700 cursor-pointer" onClick={() => toggleSessionDetails(sess.sessionId)}>
                                   <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
                                      <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
                                      <span className="flex items-center gap-1.5"><Clock size={16}/> {new Date(sess.timestamp).toLocaleTimeString('th-TH')}</span>
@@ -470,20 +512,34 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                            <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">ผลรวมครั้งนี้</div>
                                         </div>
                                      </div>
-                                     <button onClick={() => { if(confirm('ลบประวัตินี้?')) { StorageService.deleteSession(selectedStudent.id, sess.sessionId); loadDataFromLocal(); } }} className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"><Trash2 size={20}/></button>
+                                     {/* ปุ่มลูกศรแสดงสถานะเปิด/ปิด */}
+                                     <div className="p-2 rounded-full bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                         {expandedSessions.has(sess.sessionId) ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                                     </div>
+                                     {/* ปุ่มลบคะแนน เรียกใช้ฟังก์ชัน handleClickDeleteSession */}
+                                     <button 
+                                        onClick={(e) => handleClickDeleteSession(selectedStudent.id, sess.sessionId, e)} 
+                                        className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"
+                                     >
+                                         <Trash2 size={20}/>
+                                     </button>
                                   </div>
                                </div>
-                               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30">
-                                  {sess.details?.map((d, dIdx) => (
-                                    <div key={dIdx} className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center shadow-inner">
-                                       <span className="text-base font-bold font-mono text-slate-200">{d.questionText}</span>
-                                       <div className="flex items-center gap-2">
-                                          {d.isCorrect ? <CheckCircle2 size={18} className="text-green-400"/> : <XCircle size={18} className="text-red-400"/>}
-                                          <span className="text-[10px] text-slate-500">+{d.scoreEarned}</span>
-                                       </div>
-                                    </div>
-                                  ))}
-                               </div>
+                               
+                               {/* ส่วนรายละเอียดโจทย์ (แสดงเฉพาะตอนกดเปิด) */}
+                               {expandedSessions.has(sess.sessionId) && (
+                                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30 animate-pop-in">
+                                      {sess.details?.map((d, dIdx) => (
+                                        <div key={dIdx} className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center shadow-inner">
+                                           <span className="text-base font-bold font-mono text-slate-200">{d.questionText}</span>
+                                           <div className="flex items-center gap-2">
+                                              {d.isCorrect ? <CheckCircle2 size={18} className="text-green-400"/> : <XCircle size={18} className="text-red-400"/>}
+                                              <span className="text-[10px] text-slate-500">+{d.scoreEarned}</span>
+                                           </div>
+                                        </div>
+                                      ))}
+                                   </div>
+                               )}
                             </div>
                           ))
                         ) : ( <div className="text-center py-20 text-slate-600 italic">ยังไม่มีประวัติการเล่นในโหมดนี้</div> )}
