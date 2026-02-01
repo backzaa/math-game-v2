@@ -57,7 +57,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
-  const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
+  const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'แม่น้ำแสนซน' }, { id: 'ocean', label: 'โลกใต้ทะเล' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาทพาสเทล' }];
 
   const loadDataFromLocal = () => {
       setStudents(StorageService.getAllStudents());

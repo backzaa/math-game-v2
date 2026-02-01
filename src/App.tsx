@@ -8,24 +8,35 @@ import {
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
   Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle,
-  Music, SkipForward, Play, Pause, Settings
-} from 'lucide-react';
+  // [แก้ไข 1] เพิ่ม PlayCircle กลับมา
+  Music, SkipForward, Play, Pause, Settings} from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
 import { TravelTransition } from './components/TravelTransition';
 
 const THEMES: ThemeConfig[] = [
   { id: 'jungle', name: 'ป่ามหาสนุก', bgClass: 'jungle', primaryColor: 'green', secondaryColor: 'orange', decorations: [], bgmUrls: [] },
   { id: 'space', name: 'ผจญภัยอวกาศ', bgClass: 'space', primaryColor: 'blue', secondaryColor: 'purple', decorations: [], bgmUrls: [] },
-  { id: 'boat', name: 'ล่องเรือ', bgClass: 'boat', primaryColor: 'cyan', secondaryColor: 'yellow', decorations: [], bgmUrls: [] },
-  { id: 'ocean', name: 'ดำน้ำ', bgClass: 'ocean', primaryColor: 'blue', secondaryColor: 'teal', decorations: [], bgmUrls: [] },
+  { id: 'boat', name: 'แม่น้ำแสนซน', bgClass: 'boat', primaryColor: 'cyan', secondaryColor: 'yellow', decorations: [], bgmUrls: [] },
+  { id: 'ocean', name: 'โลกใต้ทะเล', bgClass: 'ocean', primaryColor: 'blue', secondaryColor: 'teal', decorations: [], bgmUrls: [] },
   { id: 'volcano', name: 'ภูเขาไฟ', bgClass: 'volcano', primaryColor: 'red', secondaryColor: 'orange', decorations: [], bgmUrls: [] },
   { id: 'candy', name: 'เมืองขนมหวาน', bgClass: 'candy', primaryColor: 'pink', secondaryColor: 'purple', decorations: [], bgmUrls: [] },
-  { id: 'castle', name: 'ปราสาท', bgClass: 'castle', primaryColor: 'gray', secondaryColor: 'gold', decorations: [], bgmUrls: [] },
+  { id: 'castle', name: 'ปราสาทพาสเทล', bgClass: 'castle', primaryColor: 'gray', secondaryColor: 'gold', decorations: [], bgmUrls: [] },
   { id: 'random', name: 'สุ่มดินแดน', bgClass: 'random', primaryColor: 'indigo', secondaryColor: 'rose', decorations: [], bgmUrls: [] },
 ];
 
+// [แก้ไข 2] แยก HOME_THEME ออกมาเป็นตัวแปรต่างหาก (ไม่รวมใน THEMES เพื่อไม่ให้โชว์ในหน้าเลือกด่าน)
+const HOME_THEME: ThemeConfig = { 
+  id: 'home', 
+  name: 'บ้านของฉัน...', 
+  bgClass: 'bg-slate-900', 
+  primaryColor: 'gray',
+  secondaryColor: 'white',
+  decorations: [],
+  bgmUrls: []
+};
+
 export function App() {
-  const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'GAME' | 'DASHBOARD'>('LOADING');
+  const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'RETURNING' | 'GAME' | 'DASHBOARD'>('LOADING');
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState<string>('');
   const [currentGuestAvatar, setCurrentGuestAvatar] = useState<string>('');
@@ -45,7 +56,7 @@ export function App() {
   const [menuPlaylist, setMenuPlaylist] = useState<string[]>([]);
   const [activePlaylist, setActivePlaylist] = useState<string[]>([]);
 
-  // [เพิ่ม 1] Ref เพื่อเก็บ Timer ของการ Fade เสียง (กันมันตีกันเอง)
+  // Ref เพื่อเก็บ Timer ของการ Fade เสียง
   const fadeIntervalRef = useRef<any>(null);
 
   useEffect(() => {
@@ -160,11 +171,10 @@ export function App() {
   const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // [เพิ่ม 2] ฟังก์ชัน Fade Audio
+  // ฟังก์ชัน Fade Audio
   const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => void) => {
       if (!audioRef.current) return;
       
-      // เคลียร์ Interval เก่าถ้ามี (ป้องกัน Fade ตีกัน)
       if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
 
       const startVolume = audioRef.current.volume;
@@ -174,8 +184,6 @@ export function App() {
       fadeIntervalRef.current = setInterval(() => {
           const elapsed = Date.now() - startTime;
           const progress = Math.min(elapsed / duration, 1);
-          
-          // คำนวณ Volume ใหม่
           const newVolume = startVolume + (targetVolume - startVolume) * progress;
           
           if (audio) {
@@ -200,7 +208,6 @@ export function App() {
       }
   };
 
-  // Effect: เล่นเพลงตาม activePlaylist (Logic เดิม)
   useEffect(() => { 
       if (hasInteracted && activePlaylist.length > 0 && audioRef.current) { 
           const rawLink = activePlaylist[currentSongIndex]; 
@@ -216,7 +223,6 @@ export function App() {
               audioRef.current.play().catch(() => {});
           }
       } else if (activePlaylist.length === 0 && audioRef.current) {
-          // ถ้า Playlist ว่าง (เช่น เข้าเกมไปแล้ว) ให้หยุด แต่ถ้ามี Fade อยู่มันจะจัดการเอง
           if (!fadeIntervalRef.current) {
              audioRef.current.pause(); 
              audioRef.current.currentTime = 0;
@@ -224,36 +230,28 @@ export function App() {
       }
   }, [currentSongIndex, activePlaylist, hasInteracted]);
 
-  // [แก้ไข 3] Logic สลับหน้าจอ + เรียกใช้ Fade
+  // Logic สลับหน้าจอ + Fade
   useEffect(() => {
-      // หน้าเมนูต่างๆ
-      if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING'].includes(screen)) {
+      if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING', 'RETURNING'].includes(screen)) {
           if (activePlaylist !== menuPlaylist) {
-              // เปลี่ยนเป็นเพลงเมนู
               setActivePlaylist(menuPlaylist);
               if (menuPlaylist.length > 0 && activePlaylist.length === 0) {
                   setCurrentSongIndex(0);
-                  // ถ้ากลับมาหน้าเมนู ให้เริ่มเสียงที่ 0 แล้ว Fade In ไปที่ bgmVolume
                   if (audioRef.current) {
                       audioRef.current.volume = 0;
                       audioRef.current.play().catch(()=>{});
-                      fadeAudio(bgmVolume, 1500); // 1.5 วินาที
+                      fadeAudio(bgmVolume, 1500); 
                   }
               }
           } else {
-              // กรณีอยู่หน้าเดิม แต่เสียงอาจจะเบาอยู่ (เพราะเพิ่ง Fade Out กลับมา)
-              // สั่ง Fade In กลับมาที่ระดับปกติ
               if (audioRef.current && audioRef.current.volume < bgmVolume) {
                   fadeAudio(bgmVolume, 1000);
               }
           }
       } 
-      // หน้าเข้าเกม
       else if (screen === 'GAME') {
-          // สั่ง Fade Out (ลดเสียงเหลือ 0 ใน 1.5 วินาที)
           if (audioRef.current && !audioRef.current.paused) {
               fadeAudio(0, 1500, () => {
-                  // พอเสียงเงียบสนิท ค่อยสั่งหยุดจริง
                   setActivePlaylist([]);
                   audioRef.current?.pause();
               });
@@ -267,7 +265,6 @@ export function App() {
 
   useEffect(() => { if (audioRef.current) { if (isPlaying && activePlaylist.length > 0) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else if (activePlaylist.length > 0) { audioRef.current.pause(); } } }, [isPlaying, activePlaylist]);
   
-  // ปรับ volume (แต่ถ้ากำลัง Fade อยู่ อย่าเพิ่งไปกวนมัน)
   useEffect(() => { 
       if (audioRef.current && !fadeIntervalRef.current) {
           audioRef.current.volume = bgmVolume; 
@@ -382,6 +379,11 @@ export function App() {
       return <TravelTransition theme={selectedTheme} onTransitionEnd={() => setScreen('GAME')} />;
     }
 
+    // [ส่วนที่แก้ไข] ใช้ HOME_THEME ที่ประกาศแยกออกมาแล้ว
+    if (screen === 'RETURNING') {
+      return <TravelTransition theme={HOME_THEME} onTransitionEnd={() => setScreen('MODE_SELECT')} />;
+    }
+
     if (screen === 'DASHBOARD') {
       return <TeacherDashboard onLogout={() => setScreen('LOGIN')} />;
     }
@@ -407,10 +409,10 @@ export function App() {
                       details: sessionDetails 
                   });
                 }
-                setScreen('MODE_SELECT'); 
+                setScreen('RETURNING'); 
                 setSelectedTheme(null); 
             }} 
-            onExit={() => setScreen('MODE_SELECT')} 
+            onExit={() => setScreen('RETURNING')} 
         />
       );
     }

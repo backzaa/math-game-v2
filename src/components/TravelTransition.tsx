@@ -162,7 +162,7 @@ export const TravelTransition: React.FC<Props> = ({ theme, onTransitionEnd }) =>
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
             <div className="text-center opacity-0 animate-text-fade-in" style={{fontFamily: "'Kanit', sans-serif"}}>
                 <h2 className="text-3xl md:text-5xl font-light text-white/80 mb-3 tracking-wider">
-                    กำลังเดินทางไปยัง...
+                    กำลังเดินทางไป...
                 </h2>
                 <p className="text-yellow-300 text-4xl md:text-6xl font-extrabold tracking-wide drop-shadow-[0_2px_10px_rgba(250,204,21,0.5)]">
                     {theme.name}
