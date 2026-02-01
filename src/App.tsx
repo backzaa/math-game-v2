@@ -41,8 +41,12 @@ export function App() {
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
   const isDataLoaded = useRef(false);
 
+  // Playlist ที่โหลดมา (App เล่นแค่ menuPlaylist)
   const [menuPlaylist, setMenuPlaylist] = useState<string[]>([]);
   const [activePlaylist, setActivePlaylist] = useState<string[]>([]);
+
+  // [เพิ่ม 1] Ref เพื่อเก็บ Timer ของการ Fade เสียง (กันมันตีกันเอง)
+  const fadeIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -93,19 +97,6 @@ export function App() {
 
     startLoading();
   }, [screen]);
-
-  // Logic การสลับ Playlist (เล่นเฉพาะหน้าเมนู)
-  useEffect(() => {
-      if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING'].includes(screen)) {
-          if (activePlaylist !== menuPlaylist) {
-              setActivePlaylist(menuPlaylist);
-              if (menuPlaylist.length > 0 && activePlaylist.length === 0) setCurrentSongIndex(0); 
-          }
-      } else {
-          // ถ้าเข้าเกม หรือไปหน้าอื่น ให้หยุดเพลงของ App
-          setActivePlaylist([]); 
-      }
-  }, [screen, menuPlaylist]);
 
   const hasPlayedClassroomToday = () => {
     if (!currentStudentId || currentStudentId === '00') return false; 
@@ -169,6 +160,36 @@ export function App() {
   const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // [เพิ่ม 2] ฟังก์ชัน Fade Audio
+  const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => void) => {
+      if (!audioRef.current) return;
+      
+      // เคลียร์ Interval เก่าถ้ามี (ป้องกัน Fade ตีกัน)
+      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+
+      const startVolume = audioRef.current.volume;
+      const startTime = Date.now();
+      const audio = audioRef.current;
+
+      fadeIntervalRef.current = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // คำนวณ Volume ใหม่
+          const newVolume = startVolume + (targetVolume - startVolume) * progress;
+          
+          if (audio) {
+              audio.volume = Math.max(0, Math.min(1, newVolume));
+          }
+
+          if (progress >= 1) {
+              clearInterval(fadeIntervalRef.current);
+              fadeIntervalRef.current = null;
+              if (onComplete) onComplete();
+          }
+      }, 50);
+  };
+
   const handleGlobalClick = () => {
       if (!hasInteracted) {
           setHasInteracted(true);
@@ -179,6 +200,7 @@ export function App() {
       }
   };
 
+  // Effect: เล่นเพลงตาม activePlaylist (Logic เดิม)
   useEffect(() => { 
       if (hasInteracted && activePlaylist.length > 0 && audioRef.current) { 
           const rawLink = activePlaylist[currentSongIndex]; 
@@ -194,13 +216,63 @@ export function App() {
               audioRef.current.play().catch(() => {});
           }
       } else if (activePlaylist.length === 0 && audioRef.current) {
-          audioRef.current.pause(); 
-          audioRef.current.currentTime = 0;
+          // ถ้า Playlist ว่าง (เช่น เข้าเกมไปแล้ว) ให้หยุด แต่ถ้ามี Fade อยู่มันจะจัดการเอง
+          if (!fadeIntervalRef.current) {
+             audioRef.current.pause(); 
+             audioRef.current.currentTime = 0;
+          }
       }
   }, [currentSongIndex, activePlaylist, hasInteracted]);
 
-  useEffect(() => { if (audioRef.current) { if (isPlaying && activePlaylist.length > 0) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else { audioRef.current.pause(); } } }, [isPlaying, activePlaylist]);
-  useEffect(() => { if (audioRef.current) audioRef.current.volume = bgmVolume; }, [bgmVolume]);
+  // [แก้ไข 3] Logic สลับหน้าจอ + เรียกใช้ Fade
+  useEffect(() => {
+      // หน้าเมนูต่างๆ
+      if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING'].includes(screen)) {
+          if (activePlaylist !== menuPlaylist) {
+              // เปลี่ยนเป็นเพลงเมนู
+              setActivePlaylist(menuPlaylist);
+              if (menuPlaylist.length > 0 && activePlaylist.length === 0) {
+                  setCurrentSongIndex(0);
+                  // ถ้ากลับมาหน้าเมนู ให้เริ่มเสียงที่ 0 แล้ว Fade In ไปที่ bgmVolume
+                  if (audioRef.current) {
+                      audioRef.current.volume = 0;
+                      audioRef.current.play().catch(()=>{});
+                      fadeAudio(bgmVolume, 1500); // 1.5 วินาที
+                  }
+              }
+          } else {
+              // กรณีอยู่หน้าเดิม แต่เสียงอาจจะเบาอยู่ (เพราะเพิ่ง Fade Out กลับมา)
+              // สั่ง Fade In กลับมาที่ระดับปกติ
+              if (audioRef.current && audioRef.current.volume < bgmVolume) {
+                  fadeAudio(bgmVolume, 1000);
+              }
+          }
+      } 
+      // หน้าเข้าเกม
+      else if (screen === 'GAME') {
+          // สั่ง Fade Out (ลดเสียงเหลือ 0 ใน 1.5 วินาที)
+          if (audioRef.current && !audioRef.current.paused) {
+              fadeAudio(0, 1500, () => {
+                  // พอเสียงเงียบสนิท ค่อยสั่งหยุดจริง
+                  setActivePlaylist([]);
+                  audioRef.current?.pause();
+              });
+          } else {
+              setActivePlaylist([]);
+          }
+      } else {
+          setActivePlaylist([]);
+      }
+  }, [screen, menuPlaylist, bgmVolume]);
+
+  useEffect(() => { if (audioRef.current) { if (isPlaying && activePlaylist.length > 0) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else if (activePlaylist.length > 0) { audioRef.current.pause(); } } }, [isPlaying, activePlaylist]);
+  
+  // ปรับ volume (แต่ถ้ากำลัง Fade อยู่ อย่าเพิ่งไปกวนมัน)
+  useEffect(() => { 
+      if (audioRef.current && !fadeIntervalRef.current) {
+          audioRef.current.volume = bgmVolume; 
+      }
+  }, [bgmVolume]);
 
   const handleNextSong = () => { if (activePlaylist.length > 0) { setCurrentSongIndex((prev) => (prev + 1) % activePlaylist.length); } };
   const handleSelectSong = (index: number) => { setCurrentSongIndex(index); setIsPlaying(true); setShowMusicMenu(false); setAudioError(false); };
@@ -382,7 +454,7 @@ export function App() {
       
       {audioError && hasInteracted && activePlaylist.length > 0 && (<div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce"><button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base"><Music className="animate-pulse" size={16}/> เล่นเพลง</button></div>)}
 
-      {/* [แก้ไข] ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม (เพราะ GameBoard มีของตัวเองแล้ว) */}
+      {/* ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม */}
       {screen !== 'GAME' && (
         <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
             {activePlaylist.length > 0 && (<div className="relative"><button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} /></button>{showMusicMenu && (<div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]"><div className="flex gap-2 mb-2"><button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button><button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button></div><div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">{activePlaylist.map((_, idx) => (<button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>🎵 เพลงที่ {idx + 1}</button>))}</div></div>)}</div>)}

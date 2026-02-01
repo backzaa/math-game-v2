@@ -108,7 +108,32 @@ export const GameBoard: React.FC<Props> = ({
   
   const spinIntervalRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fadeIntervalRef = useRef<any>(null); // <--- เพิ่มบรรทัดนี้
   const playersRef = useRef(localPlayers);
+
+// แทรกฟังก์ชันนี้ลงไป
+const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => void) => {
+    if (!audioRef.current) return;
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+
+    const startVolume = audioRef.current.volume;
+    const startTime = Date.now();
+    const audio = audioRef.current;
+
+    fadeIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const newVolume = startVolume + (targetVolume - startVolume) * progress;
+        
+        if (audio) audio.volume = Math.max(0, Math.min(1, newVolume));
+
+        if (progress >= 1) {
+            clearInterval(fadeIntervalRef.current);
+            fadeIntervalRef.current = null;
+            if (onComplete) onComplete();
+        }
+    }, 50);
+};
 
   useEffect(() => { 
       if (gameMode === 'CLASSROOM') { 
@@ -122,9 +147,48 @@ export const GameBoard: React.FC<Props> = ({
       const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { setCurrentSongIndex(0); } 
   }, [theme, currentThemeKey, defaultAssets, gameMode]);
   
-  useEffect(() => { if (hasInteracted && activeAssets.bgmPlaylist.length > 0 && audioRef.current) { const rawLink = activeAssets.bgmPlaylist[currentSongIndex]; const directLink = getDirectAudioLink(rawLink); if (audioRef.current.src !== directLink) { audioRef.current.src = directLink; audioRef.current.load(); const playPromise = audioRef.current.play(); if (playPromise !== undefined) { playPromise.then(() => { setIsPlaying(true); setAudioError(false); }).catch(error => { console.log("Auto-play prevented", error); setIsPlaying(false); setAudioError(true); }); } } } }, [currentSongIndex, activeAssets.bgmPlaylist, hasInteracted]);
+  // แทนที่ useEffect ก้อนเดิมด้วยก้อนนี้
+useEffect(() => { 
+    if (hasInteracted && activeAssets.bgmPlaylist.length > 0 && audioRef.current) { 
+        const rawLink = activeAssets.bgmPlaylist[currentSongIndex]; 
+        const directLink = getDirectAudioLink(rawLink); 
+        
+        if (audioRef.current.src !== directLink) { 
+            audioRef.current.src = directLink; 
+            audioRef.current.load(); 
+            const playPromise = audioRef.current.play(); 
+            if (playPromise !== undefined) { 
+                // เริ่มที่เสียง 0 แล้ว Fade In ไปที่ bgmVolume ใน 2 วินาที
+                audioRef.current.volume = 0;
+                playPromise.then(() => { 
+                    setIsPlaying(true); 
+                    setAudioError(false); 
+                    fadeAudio(bgmVolume, 2000); // <--- สั่ง Fade In ตรงนี้
+                }).catch(error => { 
+                    console.log("Auto-play prevented", error); 
+                    setIsPlaying(false); 
+                    setAudioError(true); 
+                }); 
+            } 
+        } else {
+            // กรณีเพลงเดิม (กด Play/Pause)
+            if (isPlaying) {
+                audioRef.current.play().catch(()=>{});
+                // ถ้าเสียงยังไม่เต็ม (เช่น เพิ่งกลับมาจากหน้าอื่น) ให้ Fade In
+                if (audioRef.current.volume < bgmVolume) fadeAudio(bgmVolume, 1000);
+            } else {
+                audioRef.current.pause();
+            }
+        }
+    } 
+}, [currentSongIndex, activeAssets.bgmPlaylist, hasInteracted, isPlaying]); // เพิ่ม isPlaying ใน dependency
   useEffect(() => { if (audioRef.current) { if (isPlaying) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else { audioRef.current.pause(); } } }, [isPlaying]);
-  useEffect(() => { if (audioRef.current) audioRef.current.volume = bgmVolume; }, [bgmVolume]);
+  // แก้เป็น
+useEffect(() => { 
+    if (audioRef.current && !fadeIntervalRef.current) { // เพิ่มเงื่อนไข !fadeIntervalRef.current
+        audioRef.current.volume = bgmVolume; 
+    } 
+}, [bgmVolume]);
 
   const handleUserInteract = () => { setHasInteracted(true); setIsPlaying(true); };
   const handleNextSong = () => { if (activeAssets.bgmPlaylist.length > 0) { setCurrentSongIndex((prev) => (prev + 1) % activeAssets.bgmPlaylist.length); } };
