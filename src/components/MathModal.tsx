@@ -66,17 +66,22 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
     }, 3000);
   };
 
+  // [แก้ไข 1] ฟังก์ชันเปิดเครื่องคิดเลข: แค่เปิดเฉยๆ ยังไม่หักสิทธิ์
   const activateCalculator = () => {
       if (calculatorUsesLeft > 0 && !feedback.show) {
           setShowCalculator(true);
-          if (!usedCalcInThisQuestion) {
-              onConsumeCalculator(); 
-              setUsedCalcInThisQuestion(true);
-          }
+          // เอา logic การหักสิทธิ์ออกไปจากตรงนี้
       }
   };
 
+  // [แก้ไข 2] ฟังก์ชันกดปุ่ม: หักสิทธิ์เมื่อมีการกดปุ่มครั้งแรก
   const handleCalcInput = (val: string) => {
+      // เช็คว่าเคยหักสิทธิ์ในข้อนี้ไปหรือยัง ถ้ายังให้หักเลย
+      if (!usedCalcInThisQuestion) {
+          onConsumeCalculator(); 
+          setUsedCalcInThisQuestion(true);
+      }
+
       if(val === 'C') setCalcDisplay('0');
       else if(val === 'DEL') {
           setCalcDisplay(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
@@ -125,9 +130,8 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
 
        <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl">
           
-          {/* [UI เครื่องคิดเลขใหม่: กลางจอ + เล็กลง + น่ารัก] */}
           {showCalculator && (
-              // Wrapper: fixed inset-0 เพื่อบังคับให้อยู่กลางจอเสมอ พร้อมพื้นหลังจางๆ
+              // Fixed + Inset-0 เพื่อบังคับให้อยู่กลางจอเสมอ พร้อมพื้นหลังจางๆ
               <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                   <div className="w-[260px] bg-slate-800 rounded-[25px] p-3 flex flex-col border-4 border-orange-400 shadow-2xl animate-pop-in">
                       
