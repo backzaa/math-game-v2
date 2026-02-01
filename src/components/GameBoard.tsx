@@ -67,12 +67,10 @@ export const GameBoard: React.FC<Props> = ({
   const getDirectImageLink = (url: string) => { if (!url) return ''; if (url.includes('drive.google.com') && url.includes('/d/')) { const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (idMatch && idMatch[1]) return `https://lh3.googleusercontent.com/d/${idMatch[1]}`; } return url; };
   const getGradientStyle = () => { switch(currentThemeKey) { case 'space': return 'radial-gradient(circle at center, #1e293b 0%, #000000 100%)'; case 'jungle': return 'linear-gradient(to bottom, #14532d, #064e3b)'; case 'ocean': return 'linear-gradient(180deg, #0e7490 0%, #164e63 100%)'; case 'boat': return 'linear-gradient(to bottom, #38bdf8, #0ea5e9, #fde047)'; case 'volcano': return 'linear-gradient(to top, #450a0a, #7f1d1d)'; case 'candy': return 'radial-gradient(circle, #fbcfe8 0%, #db2777 100%)'; case 'castle': return 'linear-gradient(to bottom, #334155, #1e293b)'; default: return 'linear-gradient(to bottom, #475569, #334155)'; } };
   
-  // ฟังก์ชันเช็คว่าเป็น มือถือ หรือ แท็บเล็ต (ครอบคลุม iPad และ Android Tablet)
   const isMobileDevice = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
   };
 
-  // ถ้าเป็นคอมพิวเตอร์ ให้ลดเสียงลง 30% (คูณ 0.7) ถ้าเป็นมือถือ/แท็บเล็ต ใช้เสียงเดิม
   const [bgmVolume, setBgmVolume] = useState(isMobileDevice() ? 0.8 : (0.8 * 0.7));
   const [sfxVolume, setSfxVolume] = useState(isMobileDevice() ? 0.3 : (0.4 * 0.7));
   const [showSettings, setShowSettings] = useState(false);
@@ -103,16 +101,14 @@ export const GameBoard: React.FC<Props> = ({
   const [isSpinning, setIsSpinning] = useState(false);
   const [displayNumber, setDisplayNumber] = useState(1);
   const [trapBackSteps, setTrapBackSteps] = useState(0);
-  // [เพิ่มใหม่] ตัวแปรเช็คว่ากำลังจะจบเทิร์น (เอาไว้หน่วงเวลาให้ปุ่มแดงค้าง)
   const [isFinishingTurn, setIsFinishingTurn] = useState(false);
   
   const spinIntervalRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fadeIntervalRef = useRef<any>(null); // <--- เพิ่มบรรทัดนี้
+  const fadeIntervalRef = useRef<any>(null); 
   const playersRef = useRef(localPlayers);
 
-// แทรกฟังก์ชันนี้ลงไป
-const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => void) => {
+  const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => void) => {
     if (!audioRef.current) return;
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
 
@@ -133,7 +129,7 @@ const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => vo
             if (onComplete) onComplete();
         }
     }, 50);
-};
+  };
 
   useEffect(() => { 
       if (gameMode === 'CLASSROOM') { 
@@ -144,14 +140,15 @@ const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => vo
           if (pool.length > 0) { const shuffled = [...pool].sort(() => 0.5 - Math.random()); setGameQuestions(shuffled.slice(0, 10)); } 
           else { setGameQuestions([{id:'free', question:'2+2', answer:4, options:[3,4,5,6]}]); } 
       } 
-      const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { 
-        // สุ่มเลขตั้งแต่ 0 ถึง จำนวนเพลงที่มี
+      const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); 
+      
+      // [แก้ไข 1] สุ่มเพลงเมื่อเริ่มเกม
+      if (playlist.length > 0) { 
         setCurrentSongIndex(Math.floor(Math.random() * playlist.length)); 
-    } 
+      } 
   }, [theme, currentThemeKey, defaultAssets, gameMode]);
   
-  // แทนที่ useEffect ก้อนเดิมด้วยก้อนนี้
-useEffect(() => { 
+  useEffect(() => { 
     if (hasInteracted && activeAssets.bgmPlaylist.length > 0 && audioRef.current) { 
         const rawLink = activeAssets.bgmPlaylist[currentSongIndex]; 
         const directLink = getDirectAudioLink(rawLink); 
@@ -161,12 +158,11 @@ useEffect(() => {
             audioRef.current.load(); 
             const playPromise = audioRef.current.play(); 
             if (playPromise !== undefined) { 
-                // เริ่มที่เสียง 0 แล้ว Fade In ไปที่ bgmVolume ใน 2 วินาที
                 audioRef.current.volume = 0;
                 playPromise.then(() => { 
                     setIsPlaying(true); 
                     setAudioError(false); 
-                    fadeAudio(bgmVolume, 2000); // <--- สั่ง Fade In ตรงนี้
+                    fadeAudio(bgmVolume, 2000); 
                 }).catch(error => { 
                     console.log("Auto-play prevented", error); 
                     setIsPlaying(false); 
@@ -174,24 +170,21 @@ useEffect(() => {
                 }); 
             } 
         } else {
-            // กรณีเพลงเดิม (กด Play/Pause)
             if (isPlaying) {
                 audioRef.current.play().catch(()=>{});
-                // ถ้าเสียงยังไม่เต็ม (เช่น เพิ่งกลับมาจากหน้าอื่น) ให้ Fade In
                 if (audioRef.current.volume < bgmVolume) fadeAudio(bgmVolume, 1000);
             } else {
                 audioRef.current.pause();
             }
         }
     } 
-}, [currentSongIndex, activeAssets.bgmPlaylist, hasInteracted, isPlaying]); // เพิ่ม isPlaying ใน dependency
-  useEffect(() => { if (audioRef.current) { if (isPlaying) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else { audioRef.current.pause(); } } }, [isPlaying]);
-  // แก้เป็น
-useEffect(() => { 
-    if (audioRef.current && !fadeIntervalRef.current) { // เพิ่มเงื่อนไข !fadeIntervalRef.current
+  }, [currentSongIndex, activeAssets.bgmPlaylist, hasInteracted, isPlaying]);
+
+  useEffect(() => { 
+    if (audioRef.current && !fadeIntervalRef.current) { 
         audioRef.current.volume = bgmVolume; 
     } 
-}, [bgmVolume]);
+  }, [bgmVolume]);
 
   const handleUserInteract = () => { setHasInteracted(true); setIsPlaying(true); };
   const handleNextSong = () => { if (activeAssets.bgmPlaylist.length > 0) { setCurrentSongIndex((prev) => (prev + 1) % activeAssets.bgmPlaylist.length); } };
@@ -274,7 +267,6 @@ useEffect(() => {
           const result = Math.floor(Math.random() * 6) + 1; 
           setDisplayNumber(result); 
           
-          // [แก้ไข] ย้าย setIsSpinning(false) เข้ามาไว้ใน Timeout เพื่อเชื่อมต่อกับ startMove ไม่ให้มีช่องว่างปุ่มฟ้า
           setTimeout(() => { 
               setIsSpinning(false); 
               startMove(result); 
@@ -301,11 +293,9 @@ useEffect(() => {
       const isTrap = activeOverlay?.type === 'TRAP'; 
       const currentPos = playersRef.current[localCurrentIndex].position; 
       
-      // ปิดหน้าต่างแจ้งเตือน/โจทย์
       setActiveOverlay(null); 
       setActiveQuestion(null); 
       
-      // [แก้ไข] สั่ง isMoving=true ทันที เพื่อ "เลี้ยงสถานะปุ่มแดง" ไว้ช่วงรอ Delay
       setIsMoving(true); 
 
       if (isTrap) { 
@@ -314,9 +304,8 @@ useEffect(() => {
           newPlayers[localCurrentIndex].position = backPos; 
           setLocalPlayers(newPlayers); 
           
-          // รอสักพักค่อยจบเทิร์น (ปุ่มจะแดงตลอดช่วงนี้เพราะ isMoving=true)
           setTimeout(() => {
-              setIsMoving(false); // หยุดสถานะเดิน
+              setIsMoving(false); 
               endTurn();
           }, 500); 
           return; 
@@ -327,21 +316,15 @@ useEffect(() => {
           setPendingSteps(0); 
           setTimeout(() => moveOneStep(steps, playersRef.current[localCurrentIndex].position), 500); 
       } else { 
-          // [แก้ไข] ต้องปิดสถานะเดินก่อน ไม่งั้นปุ่มจะค้างเป็นสีแดงตลอดไป
           setIsMoving(false); 
           endTurn();
       }
   };
-  // [แก้ไข] endTurn แบบหน่วงเวลา 0.8 วินาที
-  const endTurn = () => { 
-      // 1. สั่งให้สถานะ "กำลังจบ" ทำงาน (เพื่อให้ปุ่มยังเป็นสีแดงอยู่)
-      setIsFinishingTurn(true); 
 
-      // 2. รอ 0.8 วินาที (800 ms)
+  const endTurn = () => { 
+      setIsFinishingTurn(true); 
       setTimeout(() => {
-          setIsFinishingTurn(false); // ปิดสถานะ "กำลังจบ" (ปุ่มกลับเป็นสีฟ้า)
-          
-          // เปลี่ยนเทิร์น (ถึงเล่นคนเดียว สูตรนี้ก็ใช้ได้ครับ มันจะวนกลับมาที่ตัวเองอัตโนมัติ)
+          setIsFinishingTurn(false); 
           const nextIndex = (localCurrentIndex + 1) % localPlayers.length; 
           setLocalCurrentIndex(nextIndex); 
           setDisplayNumber(1); 
@@ -364,13 +347,11 @@ useEffect(() => {
   
   const handleConsumeCalculator = () => { const newPlayers = [...playersRef.current]; if (newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; setLocalPlayers(newPlayers); } };
   
-
   const generateSvgPath = (coords: {x:number, y:number}[]) => { if (coords.length === 0) return ""; let d = `M ${coords[0].x} ${coords[0].y}`; for (let i = 0; i < coords.length - 1; i++) { const next = coords[i+1]; d += ` L ${next.x} ${next.y}`; } return d; };
   const pathD = generateSvgPath(tiles);
   const currentPlayer = localPlayers[localCurrentIndex];
   
   return (
-    // [แก้ไข] เปลี่ยน font-sans เป็น font-['Mali'] ตรงนี้ครับ
     <div className="fixed inset-0 w-full h-full overflow-hidden flex flex-col md:flex-row font-['Mali'] bg-black">
       
       {!hasInteracted && (<div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in"><div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg mx-4"><h1 className="text-3xl md:text-4xl font-black text-white mb-6">พร้อมผจญภัยหรือยัง?</h1><button onClick={handleUserInteract} className="bg-green-600 hover:bg-green-500 text-white text-xl md:text-2xl font-bold px-8 py-4 md:px-12 md:py-6 rounded-full shadow-lg flex items-center gap-3 mx-auto animate-bounce hover:scale-110 transition"><PlayCircle size={32} /> เริ่มเกมเลย!</button><p className="text-slate-400 mt-6 text-xs md:text-sm">(แตะเพื่อเปิดเสียง)</p></div></div>)}
@@ -390,7 +371,6 @@ useEffect(() => {
               {activeAssets.bg ? (isVideoBg ? (<video src={activeAssets.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />) : (<img src={activeAssets.bg} alt="Background" className="w-full h-full object-cover z-0" referrerPolicy="no-referrer" />)) : (<div className="w-full h-full" style={{ background: getGradientStyle() }} />)}
               <div className="absolute inset-0 bg-black/50 z-0"></div>
           </div>
-          {/* ปุ่ม Mute ถูกเอาออกแล้ว เหลือแค่ LogOut */}
           <button onClick={() => { localStorage.removeItem('math_game_session_players'); localStorage.removeItem('math_game_session_index'); onExit(); }} className="absolute top-4 left-4 z-50 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
           <div className="relative w-full h-full max-w-[100vh] max-h-[75vw] md:max-w-[calc(80vw-2rem)] md:max-h-[calc(100vh-2rem)] aspect-[4/3] shadow-2xl rounded-3xl overflow-hidden border-4 border-slate-700/50 backdrop-blur-sm m-4">
                 <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none"><path d={pathD} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1, 3" /><path d={pathD} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -402,7 +382,6 @@ useEffect(() => {
                     
                     return (
                         <div key={i} className={`absolute ${sizeClass} aspect-square -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-2xl border-[3px] md:border-4 shadow-[0_4px_0_rgba(0,0,0,0.2)] transition-transform z-10 ${i === currentPlayer?.position ? 'scale-110 ring-4 ring-yellow-300 z-20' : 'scale-100'} ${tileStyle}`} style={{ left: `${t.x}%`, top: `${t.y}%` }}>
-                            {/* [แก้ไข] ลบส่วนแสดงตัวเลขทิ้ง เหลือแค่ไอคอนพิเศษ */}
                             <span className={`font-black ${isSpecial || isStartFinish ? 'text-sm md:text-xl' : 'hidden'}`}>
                                 {t.type === 'START' && 'START'} 
                                 {t.type === 'FINISH' && 'FINISH'} 
@@ -413,27 +392,32 @@ useEffect(() => {
                         </div>
                     );
                 })}
+                
                 {localPlayers.map((p, i) => { 
                     const tile = tiles[Math.min(p.position, tiles.length-1)]; 
                     if (!tile) return null; 
                     return (
                         <div 
                             key={i} 
-                            // [กล่องนอก] รับผิดชอบแค่การ "เลื่อนตำแหน่ง" (Slide)
-                            className="absolute w-[7%] md:w-[5%] aspect-square -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out" 
+                            // [แก้ไข 2.1] ปรับขนาดตัวละครให้ใหญ่ขึ้น (มือถือ 12%, จอใหญ่ 8%)
+                            className="absolute w-[9%] md:w-[8%] aspect-square -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out" 
                             style={{ left: `${tile.x}%`, top: `${tile.y - 5}%` }}
                         >
-                            {/* [กล่องใน] รับผิดชอบการ "กระโดด" (Bounce) */}
                             <div className={`w-full h-full drop-shadow-2xl ${isMoving && localCurrentIndex === i ? 'animate-bounce' : ''}`}>
-                                {p.profileImage ? (
-                                    <img src={p.profileImage} className="w-full h-full rounded-full border-2 md:border-4 border-white shadow-lg object-cover" referrerPolicy="no-referrer" alt="Player" />
-                                ) : (
-                                    <CharacterSvg 
-                                        type={(p.appearance?.base === 'BOY' ? theme.player1Char : theme.player2Char) as CharacterType} 
-                                        className="w-full h-full filter drop-shadow-lg" 
-                                        appearance={p.appearance}
-                                    />
-                                )}
+                                {/* [แก้ไข 2.2] ใส่กรอบสีรุ้ง (Gradient Border) */}
+                                <div className="w-full h-full rounded-full p-[3px] md:p-[4px] bg-gradient-to-tr from-yellow-400 via-pink-500 to-cyan-400 shadow-lg">
+                                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                                        {p.profileImage ? (
+                                            <img src={p.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="Player" />
+                                        ) : (
+                                            <CharacterSvg 
+                                                type={(p.appearance?.base === 'BOY' ? theme.player1Char : theme.player2Char) as CharacterType} 
+                                                className="w-full h-full filter drop-shadow-lg scale-90" // scale-90 เพื่อไม่ให้รูปชิดขอบเกินไป
+                                                appearance={p.appearance}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     ); 
@@ -453,22 +437,18 @@ useEffect(() => {
                </div>
                <div className="text-left md:text-center overflow-hidden min-w-0"><h1 className="text-sm md:text-2xl font-black text-white truncate">{currentPlayer?.nickname || currentPlayer?.firstName}</h1><div className="hidden md:block bg-slate-800/80 w-full p-3 rounded-xl border border-slate-600 mt-3"><div className="text-xs text-slate-400 uppercase">คะแนนสะสม</div><div className="text-5xl font-black text-yellow-400">{currentPlayer?.score}</div></div><div className="md:hidden text-yellow-400 font-black text-sm">⭐ {currentPlayer?.score} คะแนน</div></div>
            </div>
-           {/* ส่วนปุ่มสุ่มตัวเลขแบบใหม่ (3D + Logic สีแดงค้างจนกว่าจะหยุดเดิน) */}
-           {/* ส่วนปุ่มสุ่มตัวเลขแบบใหม่ (แก้ไข Logic ให้แดงต่อเนื่องทุกสถานะ) */}
+           
            <div className="w-[50%] md:w-full flex justify-end md:justify-center pl-2">
                 <div className="bg-slate-800/40 p-3 rounded-2xl border-2 border-slate-600/50 shadow-xl backdrop-blur-sm flex flex-row md:flex-col items-center gap-4">
                     
-                    {/* จอแสดงผลตัวเลข */}
                     <div className="bg-slate-900 w-16 h-12 md:w-full md:h-24 rounded-xl flex items-center justify-center border-2 border-slate-600 relative shadow-inner">
                         <span className={`text-3xl md:text-6xl font-black font-mono ${isSpinning ? 'text-white/50 blur-[1px]' : 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]'}`}>
                             {displayNumber}
                         </span>
                     </div>
 
-                    {/* ปุ่มกด 3D */}
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleAction(); }} 
-                        // ห้ามกดซ้ำถ้า: หมุน / เดิน / มีแต้มค้าง / จบเทิร์น / ทำโจทย์อยู่ / หรือมีข้อความขึ้น (สมบัติ/กับดัก)
                         disabled={isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null}
                         className={`
                             relative group transition-all duration-100 ease-in-out
@@ -477,23 +457,21 @@ useEffect(() => {
                             border-b-[6px] active:border-b-0 active:translate-y-[6px] active:shadow-none
                             shadow-xl hover:scale-105
                             ${(isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) 
-                                ? 'bg-gradient-to-b from-red-500 to-red-600 border-red-800' // สถานะไม่ว่าง (แดง)
-                                : 'bg-gradient-to-b from-blue-400 to-blue-600 border-blue-800' // ว่าง (ฟ้า)
+                                ? 'bg-gradient-to-b from-red-500 to-red-600 border-red-800' 
+                                : 'bg-gradient-to-b from-blue-400 to-blue-600 border-blue-800' 
                             }
                         `}
                     >
-                        {/* ไอคอนภายในปุ่ม */}
                         <div className="drop-shadow-md text-white">
                             {isSpinning ? (
-                                <Dices className="animate-spin" size={32} /> // 1. กำลังหมุน -> ลูกเต๋า
+                                <Dices className="animate-spin" size={32} /> 
                             ) : (isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) ? (
-                                <Footprints className="animate-bounce" size={32} /> // 2. ไม่ว่าง (เดิน/โจทย์/ข้อความ) -> รอยเท้า
+                                <Footprints className="animate-bounce" size={32} /> 
                             ) : (
-                                <span className="font-black text-2xl">สุ่ม</span> // 3. ว่าง -> ข้อความ
+                                <span className="font-black text-2xl">สุ่ม</span> 
                             )}
                         </div>
                         
-                        {/* ตัวเลขแจ้งเตือนจำนวนช่อง (Badge) */}
                         {pendingSteps > 0 && (
                             <div className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 border-2 border-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center animate-bounce shadow-md z-10">
                                 {pendingSteps}
