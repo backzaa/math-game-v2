@@ -8,7 +8,6 @@ import {
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
   Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle,
-  // [แก้ไข] ลบ PlayCircle ออก
   Music, SkipForward, Play, Pause, Settings
 } from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
@@ -42,10 +41,7 @@ export function App() {
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
   const isDataLoaded = useRef(false);
 
-  // [แก้ไข] ลบ gamePlaylist ออก เพราะ App หลักไม่ต้องใช้ (ใช้แค่ menuPlaylist)
   const [menuPlaylist, setMenuPlaylist] = useState<string[]>([]);
-  
-  // Playlist ที่กำลังใช้งานอยู่ปัจจุบัน
   const [activePlaylist, setActivePlaylist] = useState<string[]>([]);
 
   useEffect(() => {
@@ -74,7 +70,6 @@ export function App() {
         const config = StorageService.getGameConfig();
         if (config) {
             if (config.themeBackgrounds) setThemeBackgrounds(config.themeBackgrounds);
-            // [แก้ไข] โหลดแค่ menuPlaylist ก็พอ ส่วน gamePlaylist ให้ GameBoard ไปโหลดเอง
             if (config.menuPlaylist) setMenuPlaylist(config.menuPlaylist);
         }
 
@@ -99,23 +94,18 @@ export function App() {
     startLoading();
   }, [screen]);
 
-  // Logic การสลับ Playlist ตามหน้าจอ
+  // Logic การสลับ Playlist (เล่นเฉพาะหน้าเมนู)
   useEffect(() => {
       if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING'].includes(screen)) {
-          // 1. ถ้าอยู่หน้าเมนู -> ใช้เพลงเมนู
           if (activePlaylist !== menuPlaylist) {
               setActivePlaylist(menuPlaylist);
-              // รีเซ็ตเพลงถ้าพึ่งเข้ามา แต่ถ้าย้ายไปมาระหว่างเมนูให้เล่นต่อ
               if (menuPlaylist.length > 0 && activePlaylist.length === 0) setCurrentSongIndex(0); 
           }
-      } else if (screen === 'GAME') {
-          // 2. ถ้าเข้าเกม -> หยุดเพลงของ App ทิ้ง (ส่ง array ว่าง)
-          setActivePlaylist([]); 
       } else {
-          // หน้าอื่นๆ (เช่น Dashboard) หยุดเพลง
-          setActivePlaylist([]);
+          // ถ้าเข้าเกม หรือไปหน้าอื่น ให้หยุดเพลงของ App
+          setActivePlaylist([]); 
       }
-  }, [screen, menuPlaylist]); // เอา activePlaylist ออกจาก dependency เพื่อกัน loop (ใช้ condition เช็คข้างในแล้ว)
+  }, [screen, menuPlaylist]);
 
   const hasPlayedClassroomToday = () => {
     if (!currentStudentId || currentStudentId === '00') return false; 
@@ -179,7 +169,6 @@ export function App() {
   const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // แตะที่ไหนก็ได้ในหน้าจอจะเปิดเสียงเอง
   const handleGlobalClick = () => {
       if (!hasInteracted) {
           setHasInteracted(true);
@@ -190,7 +179,6 @@ export function App() {
       }
   };
 
-  // Effect: เล่นเพลงตาม activePlaylist
   useEffect(() => { 
       if (hasInteracted && activePlaylist.length > 0 && audioRef.current) { 
           const rawLink = activePlaylist[currentSongIndex]; 
@@ -394,12 +382,14 @@ export function App() {
       
       {audioError && hasInteracted && activePlaylist.length > 0 && (<div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce"><button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base"><Music className="animate-pulse" size={16}/> เล่นเพลง</button></div>)}
 
-      {/* Controls: แสดงเฉพาะตอนมีเพลงเล่น (หน้าเมนู) */}
-      <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
-          {activePlaylist.length > 0 && (<div className="relative"><button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} /></button>{showMusicMenu && (<div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]"><div className="flex gap-2 mb-2"><button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button><button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button></div><div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">{activePlaylist.map((_, idx) => (<button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>🎵 เพลงที่ {idx + 1}</button>))}</div></div>)}</div>)}
-          <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Settings size={20} /></button>
-          {showSettings && (<div className="bg-slate-900/90 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000]"><div className="mb-4 text-xs"><span>BGM</span><input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div><div className="text-xs"><span>SFX</span><input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div></div>)}
-      </div>
+      {/* [แก้ไข] ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม (เพราะ GameBoard มีของตัวเองแล้ว) */}
+      {screen !== 'GAME' && (
+        <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
+            {activePlaylist.length > 0 && (<div className="relative"><button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} /></button>{showMusicMenu && (<div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]"><div className="flex gap-2 mb-2"><button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button><button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button></div><div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">{activePlaylist.map((_, idx) => (<button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>🎵 เพลงที่ {idx + 1}</button>))}</div></div>)}</div>)}
+            <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Settings size={20} /></button>
+            {showSettings && (<div className="bg-slate-900/90 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000]"><div className="mb-4 text-xs"><span>BGM</span><input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div><div className="text-xs"><span>SFX</span><input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div></div>)}
+        </div>
+      )}
 
       {renderContent()}
     </div>
