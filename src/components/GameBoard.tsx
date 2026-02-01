@@ -144,7 +144,10 @@ const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => vo
           if (pool.length > 0) { const shuffled = [...pool].sort(() => 0.5 - Math.random()); setGameQuestions(shuffled.slice(0, 10)); } 
           else { setGameQuestions([{id:'free', question:'2+2', answer:4, options:[3,4,5,6]}]); } 
       } 
-      const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { setCurrentSongIndex(0); } 
+      const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); if (playlist.length > 0) { 
+        // สุ่มเลขตั้งแต่ 0 ถึง จำนวนเพลงที่มี
+        setCurrentSongIndex(Math.floor(Math.random() * playlist.length)); 
+    } 
   }, [theme, currentThemeKey, defaultAssets, gameMode]);
   
   // แทนที่ useEffect ก้อนเดิมด้วยก้อนนี้
