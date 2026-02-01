@@ -7,7 +7,9 @@ import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail } 
 import { 
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
-  Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle
+  Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle,
+  // [แก้ไข] ลบ PlayCircle ออก
+  Music, SkipForward, Play, Pause, Settings
 } from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
 import { TravelTransition } from './components/TravelTransition';
@@ -40,6 +42,12 @@ export function App() {
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
   const isDataLoaded = useRef(false);
 
+  // [แก้ไข] ลบ gamePlaylist ออก เพราะ App หลักไม่ต้องใช้ (ใช้แค่ menuPlaylist)
+  const [menuPlaylist, setMenuPlaylist] = useState<string[]>([]);
+  
+  // Playlist ที่กำลังใช้งานอยู่ปัจจุบัน
+  const [activePlaylist, setActivePlaylist] = useState<string[]>([]);
+
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Mali:wght@400;700&display=swap';
@@ -64,8 +72,10 @@ export function App() {
         await StorageService.syncFromCloud(); 
         
         const config = StorageService.getGameConfig();
-        if (config && config.themeBackgrounds) {
-            setThemeBackgrounds(config.themeBackgrounds);
+        if (config) {
+            if (config.themeBackgrounds) setThemeBackgrounds(config.themeBackgrounds);
+            // [แก้ไข] โหลดแค่ menuPlaylist ก็พอ ส่วน gamePlaylist ให้ GameBoard ไปโหลดเอง
+            if (config.menuPlaylist) setMenuPlaylist(config.menuPlaylist);
         }
 
         clearInterval(timer);
@@ -88,6 +98,24 @@ export function App() {
 
     startLoading();
   }, [screen]);
+
+  // Logic การสลับ Playlist ตามหน้าจอ
+  useEffect(() => {
+      if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING'].includes(screen)) {
+          // 1. ถ้าอยู่หน้าเมนู -> ใช้เพลงเมนู
+          if (activePlaylist !== menuPlaylist) {
+              setActivePlaylist(menuPlaylist);
+              // รีเซ็ตเพลงถ้าพึ่งเข้ามา แต่ถ้าย้ายไปมาระหว่างเมนูให้เล่นต่อ
+              if (menuPlaylist.length > 0 && activePlaylist.length === 0) setCurrentSongIndex(0); 
+          }
+      } else if (screen === 'GAME') {
+          // 2. ถ้าเข้าเกม -> หยุดเพลงของ App ทิ้ง (ส่ง array ว่าง)
+          setActivePlaylist([]); 
+      } else {
+          // หน้าอื่นๆ (เช่น Dashboard) หยุดเพลง
+          setActivePlaylist([]);
+      }
+  }, [screen, menuPlaylist]); // เอา activePlaylist ออกจาก dependency เพื่อกัน loop (ใช้ condition เช็คข้างในแล้ว)
 
   const hasPlayedClassroomToday = () => {
     if (!currentStudentId || currentStudentId === '00') return false; 
@@ -132,6 +160,63 @@ export function App() {
     `.trim();
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
+
+  // Audio Logic
+  const getDirectAudioLink = (url: string) => { if (!url) return ''; if (url.includes('dropbox.com')) return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', ''); if (url.includes('drive.google.com') && url.includes('/d/')) { const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (idMatch && idMatch[1]) return `https://docs.google.com/uc?export=download&id=${idMatch[1]}`; } return url; };
+  
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+  };
+
+  const [bgmVolume, setBgmVolume] = useState(isMobileDevice() ? 0.8 : (0.8 * 0.7));
+  const [sfxVolume, setSfxVolume] = useState(isMobileDevice() ? 0.3 : (0.4 * 0.7));
+  const [showSettings, setShowSettings] = useState(false);
+  const [showMusicMenu, setShowMusicMenu] = useState(false);
+  
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [audioError, setAudioError] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // แตะที่ไหนก็ได้ในหน้าจอจะเปิดเสียงเอง
+  const handleGlobalClick = () => {
+      if (!hasInteracted) {
+          setHasInteracted(true);
+          setIsPlaying(true);
+          if (audioRef.current && activePlaylist.length > 0) {
+              audioRef.current.play().catch(e => console.log("Audio auto-start on click", e));
+          }
+      }
+  };
+
+  // Effect: เล่นเพลงตาม activePlaylist
+  useEffect(() => { 
+      if (hasInteracted && activePlaylist.length > 0 && audioRef.current) { 
+          const rawLink = activePlaylist[currentSongIndex]; 
+          const directLink = getDirectAudioLink(rawLink); 
+          if (audioRef.current.src !== directLink) { 
+              audioRef.current.src = directLink; 
+              audioRef.current.load(); 
+              const playPromise = audioRef.current.play(); 
+              if (playPromise !== undefined) { 
+                  playPromise.then(() => { setIsPlaying(true); setAudioError(false); }).catch(error => { console.log("Auto-play prevented", error); setIsPlaying(false); setAudioError(true); }); 
+              } 
+          } else if (audioRef.current.paused && isPlaying) {
+              audioRef.current.play().catch(() => {});
+          }
+      } else if (activePlaylist.length === 0 && audioRef.current) {
+          audioRef.current.pause(); 
+          audioRef.current.currentTime = 0;
+      }
+  }, [currentSongIndex, activePlaylist, hasInteracted]);
+
+  useEffect(() => { if (audioRef.current) { if (isPlaying && activePlaylist.length > 0) { const p = audioRef.current.play(); if(p) p.catch(()=>setAudioError(true)); } else { audioRef.current.pause(); } } }, [isPlaying, activePlaylist]);
+  useEffect(() => { if (audioRef.current) audioRef.current.volume = bgmVolume; }, [bgmVolume]);
+
+  const handleNextSong = () => { if (activePlaylist.length > 0) { setCurrentSongIndex((prev) => (prev + 1) % activePlaylist.length); } };
+  const handleSelectSong = (index: number) => { setCurrentSongIndex(index); setIsPlaying(true); setShowMusicMenu(false); setAudioError(false); };
+  const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
   const renderContent = () => {
     const transitionScreens = ['LOGIN', 'MODE_SELECT', 'THEME_SELECT'];
@@ -303,7 +388,19 @@ export function App() {
   }
 
   return (
-    <div className="h-full w-full bg-slate-900 overflow-hidden flex flex-col font-sans" style={{ fontFamily: "'Mali', cursive" }}>
+    <div onClick={handleGlobalClick} className="h-full w-full bg-slate-900 overflow-hidden flex flex-col font-sans" style={{ fontFamily: "'Mali', cursive" }}>
+      
+      <audio ref={audioRef} onEnded={handleNextSong} crossOrigin="anonymous" className="hidden" />
+      
+      {audioError && hasInteracted && activePlaylist.length > 0 && (<div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce"><button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base"><Music className="animate-pulse" size={16}/> เล่นเพลง</button></div>)}
+
+      {/* Controls: แสดงเฉพาะตอนมีเพลงเล่น (หน้าเมนู) */}
+      <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
+          {activePlaylist.length > 0 && (<div className="relative"><button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} /></button>{showMusicMenu && (<div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]"><div className="flex gap-2 mb-2"><button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button><button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button></div><div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">{activePlaylist.map((_, idx) => (<button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>🎵 เพลงที่ {idx + 1}</button>))}</div></div>)}</div>)}
+          <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Settings size={20} /></button>
+          {showSettings && (<div className="bg-slate-900/90 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000]"><div className="mb-4 text-xs"><span>BGM</span><input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div><div className="text-xs"><span>SFX</span><input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div></div>)}
+      </div>
+
       {renderContent()}
     </div>
   );

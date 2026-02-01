@@ -98,4 +98,5 @@ export interface DailyQuestionSet {
 export interface GameGlobalConfig {
     themeBackgrounds: Record<string, string>; 
     bgmPlaylist: string[];
+    menuPlaylist?: string[];    // [เพิ่มใหม่] เพลงตอนอยู่หน้าเมนู
 }

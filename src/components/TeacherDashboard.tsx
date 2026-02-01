@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
-import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode } from '../types';
+import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode, GameGlobalConfig } from '../types';
 import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock } from 'lucide-react';
 
 interface Props {
@@ -39,23 +39,22 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const [generatedQuestions, setGeneratedQuestions] = useState<MathQuestion[]>([]);
   const [newCustomQ, setNewCustomQ] = useState({ q: '', opts: ['', '', '', ''], correctIdx: 0 });
 
-  const [gameConfig, setGameConfig] = useState<{ themeBackgrounds: Record<string, string>, bgmPlaylist: string[] }>({ themeBackgrounds: {}, bgmPlaylist: [] });
-  const [bgmInput, setBgmInput] = useState('');
+  // [แก้ไข] State สำหรับ Config ให้รองรับ menuPlaylist
+  const [gameConfig, setGameConfig] = useState<GameGlobalConfig>({ themeBackgrounds: {}, bgmPlaylist: [], menuPlaylist: [] });
+  const [bgmInput, setBgmInput] = useState('');       
+  const [menuBgmInput, setMenuBgmInput] = useState(''); 
 
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentForm, setStudentForm] = useState({ id: '', firstName: '', lastName: '', nickname: '', gender: 'MALE' as Gender, classroom: '', profileImage: '', base: 'BOY' as CharacterBase, skinColor: '#fcd34d' as SkinColor });
 
-  // --- [ส่วนที่แก้ไข] States สำหรับระบบลบ (รองรับทั้งนักเรียนและคะแนน) ---
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteType, setDeleteType] = useState<'STUDENT' | 'SESSION'>('STUDENT'); // เช็คว่ากำลังลบอะไร
-  const [studentToDelete, setStudentToDelete] = useState<StudentProfile | null>(null); // เก็บข้อมูลนักเรียนที่จะลบ
-  const [sessionToDelete, setSessionToDelete] = useState<{sid: string, sessId: string} | null>(null); // เก็บข้อมูลคะแนนที่จะลบ
+  const [deleteType, setDeleteType] = useState<'STUDENT' | 'SESSION'>('STUDENT'); 
+  const [studentToDelete, setStudentToDelete] = useState<StudentProfile | null>(null); 
+  const [sessionToDelete, setSessionToDelete] = useState<{sid: string, sessId: string} | null>(null); 
   const [deleteStep, setDeleteStep] = useState<'CONFIRM' | 'PASSWORD'>('CONFIRM');
   const [deletePassword, setDeletePassword] = useState('');
-  // -------------------------------------------------------------------
 
-  // State สำหรับเก็บว่ากำลังเปิดดูรายละเอียดของรอบเล่นไหนอยู่
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
   const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'ล่องเรือ' }, { id: 'ocean', label: 'ดำน้ำ' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาท' }];
@@ -64,8 +63,13 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       setStudents(StorageService.getAllStudents());
       const cfg = StorageService.getGameConfig();
       if(cfg) {
-          setGameConfig({ themeBackgrounds: cfg.themeBackgrounds || {}, bgmPlaylist: cfg.bgmPlaylist || [] });
+          setGameConfig({ 
+              themeBackgrounds: cfg.themeBackgrounds || {}, 
+              bgmPlaylist: cfg.bgmPlaylist || [],
+              menuPlaylist: cfg.menuPlaylist || [] 
+          });
           setBgmInput((cfg.bgmPlaylist || []).join('\n'));
+          setMenuBgmInput((cfg.menuPlaylist || []).join('\n'));
       }
       let currentQs: MathQuestion[] = [];
       if (questionSettingMode === 'CLASSROOM') {
@@ -148,20 +152,22 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
   const handleSaveAssets = () => {
       try {
-          const playlist = bgmInput.split('\n').map(s => s.trim()).filter(s => s !== '');
+          const gamePlaylist = bgmInput.split('\n').map(s => s.trim()).filter(s => s !== '');
+          const menuPlaylist = menuBgmInput.split('\n').map(s => s.trim()).filter(s => s !== ''); 
           
           const convertedBackgrounds = { ...gameConfig.themeBackgrounds };
           Object.keys(convertedBackgrounds).forEach(key => {
               convertedBackgrounds[key] = getDirectImageLink(convertedBackgrounds[key]);
           });
 
-          const newConfig = {
+          const newConfig: GameGlobalConfig = {
               themeBackgrounds: convertedBackgrounds,
-              bgmPlaylist: playlist
+              bgmPlaylist: gamePlaylist,
+              menuPlaylist: menuPlaylist
           };
 
           StorageService.saveGameConfig(newConfig);
-          setGameConfig(prev => ({ ...prev, themeBackgrounds: convertedBackgrounds }));
+          setGameConfig(newConfig);
           
           alert('บันทึกการตั้งค่าเรียบร้อยแล้วครับ!');
       } catch (error) {
@@ -183,9 +189,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       setIsEditingStudent(true); setEditingStudentId(s.id); setActiveTab('STUDENTS');
   };
 
-  // --- [ส่วนที่แก้ไข] ฟังก์ชันจัดการการลบ 2 แบบ (นักเรียน / คะแนน) ---
-  
-  // 1. กดลบนักเรียน
   const handleClickDeleteStudent = (s: StudentProfile) => {
       setDeleteType('STUDENT');
       setStudentToDelete(s);
@@ -194,9 +197,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       setShowDeleteModal(true);
   };
 
-  // 2. กดลบคะแนน
   const handleClickDeleteSession = (sid: string, sessId: string, e: React.MouseEvent) => {
-      e.stopPropagation(); // หยุดไม่ให้ไปกดโดน Dropdown
+      e.stopPropagation();
       setDeleteType('SESSION');
       setSessionToDelete({ sid, sessId });
       setDeleteStep('CONFIRM');
@@ -211,14 +213,10 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const handleFinalDelete = () => {
       if (deletePassword === 'admin') {
           if (deleteType === 'STUDENT' && studentToDelete) {
-              // ลบนักเรียน
               StorageService.deleteStudent(studentToDelete.id);
-              // รีเซ็ตค่าหากลบคนที่เลือกอยู่
               if (selectedStudent?.id === studentToDelete.id) setSelectedStudent(null);
           } else if (deleteType === 'SESSION' && sessionToDelete) {
-              // ลบคะแนน
               StorageService.deleteSession(sessionToDelete.sid, sessionToDelete.sessId);
-              // อัปเดต selectedStudent เพื่อให้หน้าจอรีเฟรชคะแนนทันที
               if (selectedStudent) {
                   const updatedStudent = StorageService.getStudent(selectedStudent.id);
                   if (updatedStudent) setSelectedStudent(updatedStudent);
@@ -234,11 +232,9 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
           alert('รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่');
       }
   };
-  // -----------------------------------------------------------
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
-       {/* Modal ยืนยันการลบ (ใช้ร่วมกันทั้งลบนักเรียนและลบคะแนน) */}
        {showDeleteModal && (
            <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center backdrop-blur-sm animate-pop-in">
                <div className="bg-slate-800 p-8 rounded-2xl border-4 border-red-500/50 shadow-2xl max-w-md w-full mx-4 text-center">
@@ -410,9 +406,33 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            ))}
                        </div>
                    </div>
-                   <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-600 sticky top-0 h-fit shadow-2xl">
-                       <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4"><Music/> รายการเพลงประกอบ (BGM)</h3>
-                       <textarea value={bgmInput} onChange={e => setBgmInput(e.target.value)} placeholder={`วาง URL เพลงบรรทัดละ 1 เพลง`} className="w-full bg-slate-800 p-4 rounded-xl border border-slate-500 text-white focus:border-green-500 outline-none mb-4 h-80 font-mono text-sm shadow-inner" />
+                   
+                   <div className="space-y-6">
+                       {/* กล่อง 1: เพลงเมนู */}
+                       <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-600 shadow-2xl">
+                           <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4">
+                               <Music className="text-pink-400"/> เพลงพื้นหลังเมนู (Login/เลือกด่าน)
+                           </h3>
+                           <textarea 
+                                value={menuBgmInput} 
+                                onChange={e => setMenuBgmInput(e.target.value)} 
+                                placeholder={`วาง URL เพลงบรรทัดละ 1 เพลง\n(สำหรับหน้า Login และหน้าเลือกด่าน)`} 
+                                className="w-full bg-slate-800 p-4 rounded-xl border border-slate-500 text-white focus:border-pink-500 outline-none h-40 font-mono text-sm shadow-inner" 
+                           />
+                       </div>
+
+                       {/* กล่อง 2: เพลงในเกม */}
+                       <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-600 shadow-2xl">
+                           <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4">
+                               <Gamepad2 className="text-blue-400"/> เพลงประกอบการเล่น (ในกระดานเกม)
+                           </h3>
+                           <textarea 
+                                value={bgmInput} 
+                                onChange={e => setBgmInput(e.target.value)} 
+                                placeholder={`วาง URL เพลงบรรทัดละ 1 เพลง\n(สำหรับตอนเดินในกระดาน)`} 
+                                className="w-full bg-slate-800 p-4 rounded-xl border border-slate-500 text-white focus:border-blue-500 outline-none h-40 font-mono text-sm shadow-inner" 
+                           />
+                       </div>
                    </div>
                </div>
            </div>
@@ -453,7 +473,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                         </div>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleEditStudentClick(s)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 p-2.5 rounded-xl transition-all shadow-sm"><Edit3 size={20}/></button>
-                            {/* ปุ่มลบนักเรียน เรียกใช้ฟังก์ชัน handleClickDeleteStudent */}
                             <button onClick={() => handleClickDeleteStudent(s)} className="bg-red-600/20 text-red-400 hover:bg-red-600 p-2.5 rounded-xl transition-all shadow-sm"><Trash2 size={20}/></button>
                         </div>
                       </div>
@@ -495,7 +514,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                         {selectedStudent.sessions && selectedStudent.sessions.filter(s => s.mode === reportMode).length > 0 ? (
                           selectedStudent.sessions.filter(s => s.mode === reportMode).slice().reverse().map((sess, idx) => (
                             <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden shadow-lg transition hover:border-blue-500/30">
-                               {/* ส่วนหัวข้อเป็นปุ่มกด Dropdown */}
                                <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700 cursor-pointer" onClick={() => toggleSessionDetails(sess.sessionId)}>
                                   <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
                                      <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
@@ -512,11 +530,9 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                            <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">ผลรวมครั้งนี้</div>
                                         </div>
                                      </div>
-                                     {/* ปุ่มลูกศรแสดงสถานะเปิด/ปิด */}
                                      <div className="p-2 rounded-full bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                          {expandedSessions.has(sess.sessionId) ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
                                      </div>
-                                     {/* ปุ่มลบคะแนน เรียกใช้ฟังก์ชัน handleClickDeleteSession */}
                                      <button 
                                         onClick={(e) => handleClickDeleteSession(selectedStudent.id, sess.sessionId, e)} 
                                         className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"
@@ -526,7 +542,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                   </div>
                                </div>
                                
-                               {/* ส่วนรายละเอียดโจทย์ (แสดงเฉพาะตอนกดเปิด) */}
                                {expandedSessions.has(sess.sessionId) && (
                                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30 animate-pop-in">
                                       {sess.details?.map((d, dIdx) => (
