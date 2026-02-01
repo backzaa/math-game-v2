@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { MathQuestion } from '../types'; // แก้บรรทัดนี้ครับ
-import { Calculator, CheckCircle2, XCircle, Frown, PartyPopper } from 'lucide-react';
+import type { MathQuestion } from '../types'; 
+import { Calculator, CheckCircle2, XCircle, Frown, PartyPopper, Delete } from 'lucide-react';
 
 interface Props {
   question: MathQuestion | null;
@@ -31,27 +31,14 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
   const speak = (text: string) => {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH'; 
-        
-        // [แก้ไข] ตรวจสอบว่าเป็นมือถือหรือไม่
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        // [แก้ไข] ปรับความเร็ว: 
-        // - ถ้าเป็นมือถือ: ความเร็วปกติ (1.0)
-        // - ถ้าเป็นคอมพิวเตอร์: ลดความเร็วลง (0.8) เพื่อให้ฟังชัดขึ้น
         utterance.rate = isMobile ? 1.0 : 0.8; 
-        
-        utterance.volume = 1.0; // คงค่าเดิม: สั่งให้เร่งเสียงพูดให้ดังที่สุดเท่าที่จะทำได้
-
+        utterance.volume = 1.0;
         const voices = window.speechSynthesis.getVoices();
         const thaiVoice = voices.find(v => v.lang.includes('th') || v.lang.includes('TH'));
-        
-        if (thaiVoice) {
-            utterance.voice = thaiVoice;
-        }
-
+        if (thaiVoice) utterance.voice = thaiVoice;
         window.speechSynthesis.speak(utterance);
     }
   };
@@ -64,7 +51,6 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
     playSound(isCorrect);
     setFeedback({ isCorrect, show: true });
     
-    // [แก้ไข] เพิ่มการพูดเฉลยคำตอบ
     if (isCorrect) {
         speak("เก่งมาก ถูกต้องครับ");
     } else {
@@ -77,7 +63,7 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
       setShowCalculator(false);
       setUsedCalcInThisQuestion(false);
       setCalcDisplay('0');
-    }, 3000); // [แนะนำ] เพิ่มเวลาโชว์เป็น 3 วินาที (3000) จะได้อ่านเฉลยทัน
+    }, 3000);
   };
 
   const activateCalculator = () => {
@@ -92,9 +78,21 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
 
   const handleCalcInput = (val: string) => {
       if(val === 'C') setCalcDisplay('0');
+      else if(val === 'DEL') {
+          setCalcDisplay(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
+      }
       else if(val === '=') {
-          try { setCalcDisplay(eval(calcDisplay).toString()); } catch(e) { setCalcDisplay('Error'); }
-      } else setCalcDisplay(prev => prev === '0' ? val : prev + val);
+          try { 
+              const expression = calcDisplay.replace(/×/g, '*').replace(/÷/g, '/');
+              // eslint-disable-next-line no-eval
+              const result = eval(expression); 
+              setCalcDisplay(Number.isInteger(result) ? result.toString() : result.toFixed(2)); 
+          } catch(e) { 
+              setCalcDisplay('Error'); 
+          }
+      } else {
+          setCalcDisplay(prev => prev === '0' ? val : prev + val);
+      }
   };
 
   return (
@@ -114,13 +112,10 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
                 <>
                   <XCircle size={140} className="text-white animate-pulse" />
                   <div><h2 className="text-6xl font-black text-white drop-shadow-lg mb-2">ผิดนิดนึง</h2></div>
-                  
-                  {/* [เพิ่มใหม่] ส่วนแสดงเฉลยคำตอบ */}
                   <div className="bg-white/20 px-6 py-2 rounded-xl backdrop-blur-sm mt-2 mb-4 border-2 border-white/30">
                       <p className="text-xl text-slate-200">คำตอบที่ถูกคือ</p>
                       <p className="text-5xl font-black text-yellow-300 drop-shadow-md">{question.answer}</p>
                   </div>
-
                   <Frown size={60} className="text-slate-200" />
                 </>
               )}
@@ -129,19 +124,56 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
       )}
 
        <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl">
+          
+          {/* [UI เครื่องคิดเลขใหม่: กลางจอ + เล็กลง + น่ารัก] */}
           {showCalculator && (
-              <div className="absolute inset-0 z-10 bg-slate-800 rounded-2xl p-4 flex flex-col border-4 border-orange-500">
-                  <div className="flex justify-between items-center mb-2">
-                      <span className="text-orange-400 font-bold flex items-center gap-2"><Calculator/> เครื่องคิดเลข</span>
-                      <span className="text-xs text-slate-400">ใช้สิทธิ์แล้ว</span>
+              // Wrapper: fixed inset-0 เพื่อบังคับให้อยู่กลางจอเสมอ พร้อมพื้นหลังจางๆ
+              <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                  <div className="w-[260px] bg-slate-800 rounded-[25px] p-3 flex flex-col border-4 border-orange-400 shadow-2xl animate-pop-in">
+                      
+                      {/* หน้าจอแสดงผล */}
+                      <div className="bg-[#d4e0b3] p-2 rounded-xl mb-3 border-4 border-slate-600 shadow-inner h-16 flex items-end justify-end overflow-hidden">
+                          <div className="text-slate-800 font-mono text-3xl font-black tracking-widest">{calcDisplay}</div>
+                      </div>
+
+                      {/* แป้นพิมพ์ */}
+                      <div className="grid grid-cols-4 gap-2 mb-2">
+                          {/* แถว 1 */}
+                          <button onClick={()=>handleCalcInput('C')} className="aspect-square bg-red-400 hover:bg-red-300 text-white font-black rounded-xl shadow-[0_3px_0_#991b1b] active:translate-y-[2px] active:shadow-none text-lg">C</button>
+                          <button onClick={()=>handleCalcInput('÷')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-xl">÷</button>
+                          <button onClick={()=>handleCalcInput('×')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-xl">×</button>
+                          <button onClick={()=>handleCalcInput('DEL')} className="aspect-square bg-red-400 hover:bg-red-300 text-white flex items-center justify-center rounded-xl shadow-[0_3px_0_#991b1b] active:translate-y-[2px] active:shadow-none">
+                              <Delete size={18} strokeWidth={3} />
+                          </button>
+
+                          {/* ตัวเลข 7-9 */}
+                          <button onClick={()=>handleCalcInput('7')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">7</button>
+                          <button onClick={()=>handleCalcInput('8')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">8</button>
+                          <button onClick={()=>handleCalcInput('9')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">9</button>
+                          <button onClick={()=>handleCalcInput('-')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-2xl">-</button>
+
+                          {/* ตัวเลข 4-6 */}
+                          <button onClick={()=>handleCalcInput('4')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">4</button>
+                          <button onClick={()=>handleCalcInput('5')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">5</button>
+                          <button onClick={()=>handleCalcInput('6')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">6</button>
+                          <button onClick={()=>handleCalcInput('+')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-2xl">+</button>
+
+                          {/* ตัวเลข 1-3 */}
+                          <button onClick={()=>handleCalcInput('1')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">1</button>
+                          <button onClick={()=>handleCalcInput('2')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">2</button>
+                          <button onClick={()=>handleCalcInput('3')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">3</button>
+                          
+                          {/* ปุ่มเท่ากับ (สูง 2 ช่อง) */}
+                          <button onClick={()=>handleCalcInput('=')} className="row-span-2 bg-green-500 hover:bg-green-400 text-white font-black rounded-xl shadow-[0_3px_0_#166534] active:translate-y-[2px] active:shadow-none flex items-center justify-center text-2xl">=</button>
+
+                          {/* เลข 0 (กว้าง 3 ช่อง) */}
+                          <button onClick={()=>handleCalcInput('0')} className="col-span-3 bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none py-2 text-xl">0</button>
+                      </div>
+
+                      <button onClick={()=>setShowCalculator(false)} className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 rounded-xl font-bold border-2 border-slate-600 text-sm transition-colors mt-1">
+                          ปิดเครื่องคิดเลข
+                      </button>
                   </div>
-                  <div className="bg-black text-green-400 font-mono text-4xl p-4 text-right rounded mb-4 shadow-inner">{calcDisplay}</div>
-                  <div className="grid grid-cols-4 gap-2 flex-1">
-                      {[7,8,9,'/',4,5,6,'*',1,2,3,'-',0,'C','=','+'].map(b => (
-                          <button key={b} onClick={()=>handleCalcInput(b.toString())} className="bg-slate-700 text-white text-xl font-bold rounded hover:bg-slate-600 active:scale-95 transition">{b}</button>
-                      ))}
-                  </div>
-                  <button onClick={()=>setShowCalculator(false)} className="mt-4 bg-red-500 text-white py-3 rounded-lg font-bold">ซ่อนเครื่องคิดเลข</button>
               </div>
           )}
 
