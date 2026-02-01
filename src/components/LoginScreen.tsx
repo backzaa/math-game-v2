@@ -42,6 +42,18 @@ const customStyles = `
   0%, 100% { filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
   50% { filter: drop-shadow(0 0 20px rgba(255,255,0,0.8)); }
 }
+
+/* 7. เอฟเฟคเข้าจากซ้าย (สำหรับนักเรียน) */
+@keyframes slide-in-left {
+  0% { opacity: 0; transform: translateX(-50px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* 8. เอฟเฟคเข้าจากขวา (สำหรับครู) */
+@keyframes slide-in-right {
+  0% { opacity: 0; transform: translateX(50px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
 `;
 
 interface Props {
@@ -58,35 +70,40 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   const avatars = ['🐯', '🦁', '🐨', '🐼', '🦊', '🐰', '🐸', '🦄', '🐣'];
 
+  // Effect จัดการข้อมูลนักเรียนและการ์ด (แก้ไขล่าสุด)
   useEffect(() => {
     let showTimer: any;
     let hideTimer: any;
 
-    if (studentId === '00') {
-        const avatar = avatars[Math.floor(Math.random() * avatars.length)];
-        setDisplayData({ type: 'GUEST', avatar });
-        // หน่วงนิดนึงเพื่อให้ DOM render ก่อนสั่งขยาย
-        showTimer = setTimeout(() => setShowCard(true), 50);
-
-    } else if (studentId.length >= 1) {
-        const student = StorageService.getStudent(studentId);
-        if (student) {
-            const score = student.sessions ? student.sessions.filter(s => s.mode === 'CLASSROOM').reduce((sum, s) => sum + (s.score || 0), 0) : 0;
-            setDisplayData({ type: 'STUDENT', student, score });
-            showTimer = setTimeout(() => setShowCard(true), 50);
-        } else {
-            // ไม่พบข้อมูล -> สั่งหด
-            setShowCard(false);
-            hideTimer = setTimeout(() => setDisplayData(null), 700); // รอ Animation จบ (700ms)
-        }
-    } else {
-        // ลบเลขหมด -> สั่งหด
+    // ถ้าเลือก Tab ครู ให้ซ่อนการ์ด
+    if (activeTab === 'TEACHER') {
         setShowCard(false);
-        hideTimer = setTimeout(() => setDisplayData(null), 700);
+    } 
+    // ถ้าเลือก Tab นักเรียน ให้โชว์การ์ดตามข้อมูล
+    else {
+        if (studentId === '00') {
+            const avatar = avatars[Math.floor(Math.random() * avatars.length)];
+            setDisplayData({ type: 'GUEST', avatar });
+            showTimer = setTimeout(() => setShowCard(true), 50);
+
+        } else if (studentId.length >= 1) {
+            const student = StorageService.getStudent(studentId);
+            if (student) {
+                const score = student.sessions ? student.sessions.filter(s => s.mode === 'CLASSROOM').reduce((sum, s) => sum + (s.score || 0), 0) : 0;
+                setDisplayData({ type: 'STUDENT', student, score });
+                showTimer = setTimeout(() => setShowCard(true), 50);
+            } else {
+                setShowCard(false);
+                hideTimer = setTimeout(() => setDisplayData(null), 700);
+            }
+        } else {
+            setShowCard(false);
+            hideTimer = setTimeout(() => setDisplayData(null), 700);
+        }
     }
 
     return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
-  }, [studentId]);
+  }, [studentId, activeTab]); // เช็คทั้งเลขที่และ Tab
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex flex-col items-center justify-start md:justify-center p-4 overflow-y-auto relative overflow-hidden font-['Mali']">
@@ -103,14 +120,9 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
          <Sigma className="absolute bottom-10 right-20 text-white w-14 h-14 animate-pulse" />
       </div>
 
-      {/* [จุดสำคัญ] 
-          - ใช้ items-stretch เพื่อให้กล่องสูงเท่ากัน
-          - เอา gap-6 ออก แล้วใช้ margin ในการดันแทน เพื่อให้ animation ไหลลื่น
-      */}
       <div className="flex flex-col md:flex-row w-full max-w-5xl z-10 py-10 md:items-stretch relative transition-all duration-700 ease-in-out">
           
           {/* --- กล่องซ้าย: Login Form --- */}
-          {/* ใช้ flex-1 เพื่อให้มันยืดหดตามพื้นที่ที่เหลือ */}
           <div className="relative flex-1 animate-pop-in group z-20 transition-all duration-700 ease-[cubic-bezier(0.25,0.8,0.25,1)]">
             <div 
                 className="absolute -inset-[3px] rounded-[42px] blur-md opacity-75 transition-opacity duration-500"
@@ -157,7 +169,11 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 </div>
 
                 {activeTab === 'STUDENT' ? (
-                <div className="space-y-6">
+                <div 
+                    key="student-form" 
+                    className="space-y-6"
+                    style={{ animation: 'slide-in-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards' }}
+                >
                     <div className="relative">
                         <User className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-400" size={24}/>
                         <input 
@@ -175,8 +191,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                             className="bg-yellow-500/20 border-2 border-yellow-400/50 rounded-xl px-4 py-2 shadow-[0_0_15px_rgba(250,204,21,0.3)] backdrop-blur-sm"
                             style={{ animation: 'scale-pulse 2.5s infinite ease-in-out' }}
                         >
-                            <p className="text-sm md:text-base text-yellow-300 font-bold text-center">
-                                ✨ หมายเหตุ: โหมดผู้มาเยือน <span className="text-white text-lg underline decoration-2 underline-offset-4 drop-shadow-md ml-1">ใส่เลขที่ 00</span> ✨
+                            <p className="text-sm md:text-base text-yellow-300 font-bold text-center whitespace-nowrap">
+                                ✨ ผู้มาเยือน <span className="text-white text-lg underline decoration-2 underline-offset-4 drop-shadow-md ml-1">ใส่เลขที่ 00</span> ✨
                             </p>
                         </div>
                     </div>
@@ -197,7 +213,12 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                     </button>
                 </div>
                 ) : (
-                <form onSubmit={(e)=>{e.preventDefault(); const p = (e.target as any).pass.value; if(p==='admin') onLogin('TEACHER','admin'); else alert('รหัสผ่านไม่ถูกต้อง'); }} className="space-y-4">
+                <form 
+                    key="teacher-form"
+                    onSubmit={(e)=>{e.preventDefault(); const p = (e.target as any).pass.value; if(p==='admin') onLogin('TEACHER','admin'); else alert('รหัสผ่านไม่ถูกต้อง'); }} 
+                    className="space-y-4"
+                    style={{ animation: 'slide-in-right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards' }}
+                >
                     <input name="pass" type="password" className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl py-4 px-4 text-white text-xl font-bold" placeholder="รหัสผ่านคุณครู" />
                     <button type="submit" className="w-full bg-green-600 text-white font-bold py-4 rounded-2xl text-xl border-b-4 border-green-800 transition-transform active:scale-95">เข้าสู่ระบบครู</button>
                 </form>
@@ -206,14 +227,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
           </div>
 
           {/* --- กล่องขวา: Student Info Card (Animation ขยาย/หด) --- */}
-          {/* เรา render div นี้ไว้ตลอดตราบใดที่มี displayData แต่จะปรับ width เอา */}
           {displayData && (
               <div 
                 className={`
                     relative shrink-0 overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.25,0.8,0.25,1)]
                     ${showCard 
-                        ? 'w-full md:w-[380px] opacity-100 translate-x-0 mt-6 md:mt-0 md:ml-6'  // ตอนแสดง: กว้าง 380px, เว้นระยะซ้าย
-                        : 'w-0 md:w-0 opacity-0 translate-x-20 mt-0 md:ml-0'                     // ตอนซ่อน: กว้าง 0, ไม่เว้นระยะ
+                        ? 'w-full md:w-[380px] opacity-100 translate-x-0 mt-6 md:mt-0 md:ml-6'
+                        : 'w-0 md:w-0 opacity-0 translate-x-20 mt-0 md:ml-0'
                     }
                 `}
               >
