@@ -66,27 +66,24 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
     }, 3000);
   };
 
-  // [แก้ไข 1] ฟังก์ชันเปิดเครื่องคิดเลข: แค่เปิดเฉยๆ ยังไม่หักสิทธิ์
   const activateCalculator = () => {
       if (calculatorUsesLeft > 0 && !feedback.show) {
           setShowCalculator(true);
-          // เอา logic การหักสิทธิ์ออกไปจากตรงนี้
       }
   };
 
-  // [แก้ไข 2] ฟังก์ชันกดปุ่ม: หักสิทธิ์เมื่อมีการกดปุ่มครั้งแรก
   const handleCalcInput = (val: string) => {
-      // เช็คว่าเคยหักสิทธิ์ในข้อนี้ไปหรือยัง ถ้ายังให้หักเลย
-      if (!usedCalcInThisQuestion) {
-          onConsumeCalculator(); 
-          setUsedCalcInThisQuestion(true);
-      }
-
       if(val === 'C') setCalcDisplay('0');
       else if(val === 'DEL') {
           setCalcDisplay(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
       }
       else if(val === '=') {
+          // [แก้ไขล่าสุด] หักสิทธิ์การใช้งาน เมื่อกดปุ่ม "=" (เท่ากับ) เท่านั้น
+          if (!usedCalcInThisQuestion) {
+              onConsumeCalculator(); 
+              setUsedCalcInThisQuestion(true);
+          }
+
           try { 
               const expression = calcDisplay.replace(/×/g, '*').replace(/÷/g, '/');
               // eslint-disable-next-line no-eval
@@ -96,6 +93,7 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
               setCalcDisplay('Error'); 
           }
       } else {
+          // กดตัวเลขหรือเครื่องหมายเฉยๆ ไม่หักสิทธิ์
           setCalcDisplay(prev => prev === '0' ? val : prev + val);
       }
   };
@@ -131,18 +129,14 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
        <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl">
           
           {showCalculator && (
-              // Fixed + Inset-0 เพื่อบังคับให้อยู่กลางจอเสมอ พร้อมพื้นหลังจางๆ
               <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                   <div className="w-[260px] bg-slate-800 rounded-[25px] p-3 flex flex-col border-4 border-orange-400 shadow-2xl animate-pop-in">
                       
-                      {/* หน้าจอแสดงผล */}
                       <div className="bg-[#d4e0b3] p-2 rounded-xl mb-3 border-4 border-slate-600 shadow-inner h-16 flex items-end justify-end overflow-hidden">
                           <div className="text-slate-800 font-mono text-3xl font-black tracking-widest">{calcDisplay}</div>
                       </div>
 
-                      {/* แป้นพิมพ์ */}
                       <div className="grid grid-cols-4 gap-2 mb-2">
-                          {/* แถว 1 */}
                           <button onClick={()=>handleCalcInput('C')} className="aspect-square bg-red-400 hover:bg-red-300 text-white font-black rounded-xl shadow-[0_3px_0_#991b1b] active:translate-y-[2px] active:shadow-none text-lg">C</button>
                           <button onClick={()=>handleCalcInput('÷')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-xl">÷</button>
                           <button onClick={()=>handleCalcInput('×')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-xl">×</button>
@@ -150,27 +144,22 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
                               <Delete size={18} strokeWidth={3} />
                           </button>
 
-                          {/* ตัวเลข 7-9 */}
                           <button onClick={()=>handleCalcInput('7')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">7</button>
                           <button onClick={()=>handleCalcInput('8')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">8</button>
                           <button onClick={()=>handleCalcInput('9')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">9</button>
                           <button onClick={()=>handleCalcInput('-')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-2xl">-</button>
 
-                          {/* ตัวเลข 4-6 */}
                           <button onClick={()=>handleCalcInput('4')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">4</button>
                           <button onClick={()=>handleCalcInput('5')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">5</button>
                           <button onClick={()=>handleCalcInput('6')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">6</button>
                           <button onClick={()=>handleCalcInput('+')} className="aspect-square bg-orange-400 hover:bg-orange-300 text-white font-black rounded-xl shadow-[0_3px_0_#c2410c] active:translate-y-[2px] active:shadow-none text-2xl">+</button>
 
-                          {/* ตัวเลข 1-3 */}
                           <button onClick={()=>handleCalcInput('1')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">1</button>
                           <button onClick={()=>handleCalcInput('2')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">2</button>
                           <button onClick={()=>handleCalcInput('3')} className="aspect-square bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none text-xl">3</button>
                           
-                          {/* ปุ่มเท่ากับ (สูง 2 ช่อง) */}
                           <button onClick={()=>handleCalcInput('=')} className="row-span-2 bg-green-500 hover:bg-green-400 text-white font-black rounded-xl shadow-[0_3px_0_#166534] active:translate-y-[2px] active:shadow-none flex items-center justify-center text-2xl">=</button>
 
-                          {/* เลข 0 (กว้าง 3 ช่อง) */}
                           <button onClick={()=>handleCalcInput('0')} className="col-span-3 bg-white hover:bg-slate-100 text-slate-800 font-black rounded-xl shadow-[0_3px_0_#94a3b8] active:translate-y-[2px] active:shadow-none py-2 text-xl">0</button>
                       </div>
 
