@@ -9,14 +9,19 @@ interface Props {
   onUpdateQuestions?: (qs: MathQuestion[]) => void;
 }
 
-// ฟังก์ชันแปลงลิงก์ Google Drive
+// ฟังก์ชันแปลงลิงก์ (รองรับทั้ง Drive และ Dropbox)
 const getDirectImageLink = (url: string) => {
     if (!url) return '';
-    if (url.includes('drive.google.com') || url.includes('drive.google.com/file/d/')) {
-        const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    // Google Drive
+    if (url.includes('drive.google.com') && url.includes('/d/')) {
+        const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
         if (idMatch && idMatch[1]) {
-             return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+             return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
         }
+    }
+    // Dropbox
+    if (url.includes('dropbox.com')) {
+        return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
     }
     return url;
 };
@@ -39,7 +44,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const [generatedQuestions, setGeneratedQuestions] = useState<MathQuestion[]>([]);
   const [newCustomQ, setNewCustomQ] = useState({ q: '', opts: ['', '', '', ''], correctIdx: 0 });
 
-  // [แก้ไข] State สำหรับ Config ให้รองรับ menuPlaylist
   const [gameConfig, setGameConfig] = useState<GameGlobalConfig>({ themeBackgrounds: {}, bgmPlaylist: [], menuPlaylist: [] });
   const [bgmInput, setBgmInput] = useState('');       
   const [menuBgmInput, setMenuBgmInput] = useState(''); 
@@ -391,24 +395,32 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                    <div className="space-y-4">
                        <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4"><HardDrive/> ภาพพื้นหลังฉากต่างๆ</h3>
                        <div className="grid grid-cols-1 gap-4 max-h-[550px] overflow-y-auto pr-3 custom-scrollbar">
-                           {THEME_IDS.map((theme) => (
-                               <div key={theme.id} className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 hover:border-blue-500/50 transition">
-                                   <label className="block text-sm font-bold text-blue-300 mb-2">{theme.label}</label>
-                                   <div className="flex gap-3">
-                                       <input type="text" placeholder="URL รูปภาพ (รองรับ Google Drive)" value={gameConfig.themeBackgrounds[theme.id] || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
-                                       {gameConfig.themeBackgrounds[theme.id] && (
-                                           <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg">
-                                                <img src={getDirectImageLink(gameConfig.themeBackgrounds[theme.id])} alt="preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                           </div>
-                                       )}
+                           {THEME_IDS.map((theme) => {
+                               const bgUrl = gameConfig.themeBackgrounds[theme.id];
+                               const isVideo = bgUrl && (bgUrl.toLowerCase().endsWith('.mp4') || bgUrl.toLowerCase().includes('#.mp4'));
+
+                               return (
+                                   <div key={theme.id} className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 hover:border-blue-500/50 transition">
+                                       <label className="block text-sm font-bold text-blue-300 mb-2">{theme.label}</label>
+                                       <div className="flex gap-3">
+                                           <input type="text" placeholder="URL รูปภาพ/วิดีโอ (รองรับ Google Drive)" value={bgUrl || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
+                                           {bgUrl && (
+                                               <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg">
+                                                    {isVideo ? (
+                                                        <video src={getDirectImageLink(bgUrl)} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+                                                    ) : (
+                                                        <img src={getDirectImageLink(bgUrl)} alt="preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                    )}
+                                               </div>
+                                           )}
+                                       </div>
                                    </div>
-                               </div>
-                           ))}
+                               );
+                           })}
                        </div>
                    </div>
                    
                    <div className="space-y-6">
-                       {/* กล่อง 1: เพลงเมนู */}
                        <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-600 shadow-2xl">
                            <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4">
                                <Music className="text-pink-400"/> เพลงพื้นหลังเมนู (Login/เลือกด่าน)
@@ -421,7 +433,6 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            />
                        </div>
 
-                       {/* กล่อง 2: เพลงในเกม */}
                        <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-600 shadow-2xl">
                            <h3 className="text-xl font-bold text-slate-300 flex items-center gap-2 mb-4">
                                <Gamepad2 className="text-blue-400"/> เพลงประกอบการเล่น (ในกระดานเกม)

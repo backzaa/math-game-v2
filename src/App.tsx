@@ -8,7 +8,6 @@ import {
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
   Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle,
-  // [แก้ไข 1] เพิ่ม PlayCircle กลับมา
   Music, SkipForward, Play, Pause, Settings} from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
 import { TravelTransition } from './components/TravelTransition';
@@ -24,7 +23,6 @@ const THEMES: ThemeConfig[] = [
   { id: 'random', name: 'สุ่มดินแดน', bgClass: 'random', primaryColor: 'indigo', secondaryColor: 'rose', decorations: [], bgmUrls: [] },
 ];
 
-// [แก้ไข 2] แยก HOME_THEME ออกมาเป็นตัวแปรต่างหาก (ไม่รวมใน THEMES เพื่อไม่ให้โชว์ในหน้าเลือกด่าน)
 const HOME_THEME: ThemeConfig = { 
   id: 'home', 
   name: 'บ้านของฉัน...', 
@@ -52,11 +50,9 @@ export function App() {
   const [loadStatus, setLoadStatus] = useState('กำลังเตรียมตัวผจญภัย...');
   const isDataLoaded = useRef(false);
 
-  // Playlist ที่โหลดมา (App เล่นแค่ menuPlaylist)
   const [menuPlaylist, setMenuPlaylist] = useState<string[]>([]);
   const [activePlaylist, setActivePlaylist] = useState<string[]>([]);
 
-  // Ref เพื่อเก็บ Timer ของการ Fade เสียง
   const fadeIntervalRef = useRef<any>(null);
 
   useEffect(() => {
@@ -153,7 +149,6 @@ export function App() {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
-  // Audio Logic
   const getDirectAudioLink = (url: string) => { if (!url) return ''; if (url.includes('dropbox.com')) return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', ''); if (url.includes('drive.google.com') && url.includes('/d/')) { const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/); if (idMatch && idMatch[1]) return `https://docs.google.com/uc?export=download&id=${idMatch[1]}`; } return url; };
   
   const isMobileDevice = () => {
@@ -171,7 +166,6 @@ export function App() {
   const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ฟังก์ชัน Fade Audio
   const fadeAudio = (targetVolume: number, duration: number, onComplete?: () => void) => {
       if (!audioRef.current) return;
       
@@ -230,7 +224,6 @@ export function App() {
       }
   }, [currentSongIndex, activePlaylist, hasInteracted]);
 
-  // Logic สลับหน้าจอ + Fade
   useEffect(() => {
       if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING', 'RETURNING'].includes(screen)) {
           if (activePlaylist !== menuPlaylist) {
@@ -314,6 +307,8 @@ export function App() {
                   {THEMES.map((theme) => {
                       const bgUrl = themeBackgrounds[theme.id];
                       const hasCustomBg = bgUrl && bgUrl.trim() !== '';
+                      // [แก้ไข] เช็คว่าเป็นวิดีโอไหม
+                      const isVideo = hasCustomBg && (bgUrl.toLowerCase().endsWith('.mp4') || bgUrl.toLowerCase().includes('#.mp4'));
 
                       return (
                         <button 
@@ -353,7 +348,16 @@ export function App() {
                             className="p-10 rounded-[35px] font-bold text-xl md:text-2xl text-white shadow-2xl hover:scale-105 transition-all relative overflow-hidden group border-4 border-white/5 h-36 md:h-auto flex items-center justify-center text-center"
                         >
                             {hasCustomBg ? (
-                                <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${bgUrl})` }}>
+                                <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110">
+                                    {isVideo ? (
+                                        <video 
+                                            src={getDirectAudioLink(bgUrl)} 
+                                            className="w-full h-full object-cover opacity-80"
+                                            autoPlay loop muted playsInline
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full" style={{ backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                                    )}
                                     <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors"></div>
                                 </div>
                             ) : (
@@ -379,7 +383,6 @@ export function App() {
       return <TravelTransition theme={selectedTheme} onTransitionEnd={() => setScreen('GAME')} />;
     }
 
-    // [ส่วนที่แก้ไข] ใช้ HOME_THEME ที่ประกาศแยกออกมาแล้ว
     if (screen === 'RETURNING') {
       return <TravelTransition theme={HOME_THEME} onTransitionEnd={() => setScreen('MODE_SELECT')} />;
     }
