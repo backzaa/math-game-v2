@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { GameBoard } from './components/GameBoard';
+import { SmartBoard } from './components/SmartBoard'; // นำเข้าบอร์ดใหม่
 import { StorageService } from './services/storage'; 
-import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail } from './types'; 
+import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail, GameType } from './types'; 
 import { 
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
   Smile, Backpack, BookOpen, Infinity, Pi, Lock, CheckCircle2, Shuffle,
-  Music, SkipForward, Play, Pause, Settings} from 'lucide-react';
+  Music, SkipForward, Play, Pause, Settings, Map, Flag 
+} from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
 import { TravelTransition } from './components/TravelTransition';
 
@@ -34,11 +36,14 @@ const HOME_THEME: ThemeConfig = {
 };
 
 export function App() {
-  const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'RETURNING' | 'GAME' | 'DASHBOARD'>('LOADING');
+  const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'GAME_TYPE_SELECT' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'RETURNING' | 'GAME' | 'DASHBOARD'>('LOADING');
+  
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState<string>('');
   const [currentGuestAvatar, setCurrentGuestAvatar] = useState<string>('');
 
+  const [gameType, setGameType] = useState<GameType>('CLASSIC');
+  
   const [gameMode, setGameMode] = useState<ScoringMode>('CLASSROOM');
   const [selectedTheme, setSelectedTheme] = useState<ThemeConfig | null>(null);
   const [gamePlayers, setGamePlayers] = useState<PlayerState[]>([]);
@@ -121,7 +126,7 @@ export function App() {
           setGuestName(guestNickname);
           if (guestAvatar) setCurrentGuestAvatar(guestAvatar);
       }
-      setScreen('MODE_SELECT');
+      setScreen('GAME_TYPE_SELECT');
     }
   };
 
@@ -225,7 +230,7 @@ export function App() {
   }, [currentSongIndex, activePlaylist, hasInteracted]);
 
   useEffect(() => {
-      if (['LOGIN', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING', 'RETURNING'].includes(screen)) {
+      if (['LOGIN', 'GAME_TYPE_SELECT', 'MODE_SELECT', 'THEME_SELECT', 'TRAVELING', 'RETURNING'].includes(screen)) {
           if (activePlaylist !== menuPlaylist) {
               setActivePlaylist(menuPlaylist);
               if (menuPlaylist.length > 0 && activePlaylist.length === 0) {
@@ -269,15 +274,44 @@ export function App() {
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
   const renderContent = () => {
-    const transitionScreens = ['LOGIN', 'MODE_SELECT', 'THEME_SELECT'];
+    const transitionScreens = ['LOGIN', 'GAME_TYPE_SELECT', 'MODE_SELECT', 'THEME_SELECT'];
     if (transitionScreens.includes(screen)) {
       return (
         <PageTransition contentKey={screen}>
           {screen === 'LOGIN' && <LoginScreen onLogin={handleLogin} />}
+          
+          {screen === 'GAME_TYPE_SELECT' && (
+             <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start md:justify-center p-4 py-10 md:p-8 bg-slate-900 text-white font-bold">
+                <h1 className="text-2xl md:text-5xl font-black mb-8 md:mb-16 py-10 px-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-red-400 text-center drop-shadow-sm leading-[2.5]">
+                    เลือกรูปแบบการผจญภัย
+                </h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full px-4">
+                    <button 
+                        onClick={() => { setGameType('CLASSIC'); setScreen('MODE_SELECT'); }} 
+                        className="group relative p-8 md:p-12 rounded-[40px] bg-slate-800 border-4 border-blue-500/30 hover:border-blue-400 hover:scale-105 transition-all shadow-2xl overflow-hidden active:scale-95"
+                    >
+                        <Map className="text-blue-400 mb-6 mx-auto w-20 h-20 group-hover:rotate-12 transition-all" />
+                        <h2 className="text-3xl font-bold mb-2 text-center text-blue-300">ผจญภัยเข้าเส้นชัย</h2>
+                        <p className="text-slate-400 text-lg text-center">แบบดั้งเดิม เดินตามช่องเข้าเส้นชัย</p>
+                    </button>
+
+                    <button 
+                        onClick={() => { setGameType('RALLY'); setScreen('MODE_SELECT'); }} 
+                        className="group relative p-8 md:p-12 rounded-[40px] bg-slate-800 border-4 border-orange-500/30 hover:border-orange-400 hover:scale-105 transition-all shadow-2xl overflow-hidden active:scale-95"
+                    >
+                        <Flag className="text-orange-400 mb-6 mx-auto w-20 h-20 group-hover:-rotate-12 transition-all" />
+                        <h2 className="text-3xl font-bold mb-2 text-center text-orange-300">แข่งระยะทาง</h2>
+                        <p className="text-slate-400 text-lg text-center">ตอบถูกเพื่อเดิน สะสมระยะทางให้ไกลที่สุด!</p>
+                    </button>
+                </div>
+                <button onClick={() => setScreen('LOGIN')} className="mt-10 md:mt-16 text-slate-500 underline font-bold hover:text-white transition-colors text-lg">ออกจากระบบ</button>
+             </div>
+          )}
+
           {screen === 'MODE_SELECT' && (
             <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start md:justify-center p-4 py-10 md:p-8 bg-slate-900 text-white font-bold">
               <h1 className="text-2xl md:text-5xl font-black mb-8 md:mb-16 py-10 px-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-green-400 text-center drop-shadow-sm leading-[2.5]">
-                คิดเลขสนุก BY ครูแบ็ค
+                {gameType === 'CLASSIC' ? 'ผจญภัยเข้าเส้นชัย' : 'แข่งระยะทาง'} - เลือกโหมด
               </h1>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full px-4">
                 <button 
@@ -287,16 +321,16 @@ export function App() {
                 >
                    {hasPlayedClassroomToday() ? <Lock className="text-slate-500 mb-6 mx-auto" size={80}/> : <Star className="text-orange-400 mb-4 md:mb-6 mx-auto group-hover:rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" fill="currentColor" />}
                    <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">ห้องเรียนหรรษา</h2>
-                   <p className="text-slate-400 text-sm md:text-lg text-center">{hasPlayedClassroomToday() ? 'วันนี้คุณเล่นเก็บคะแนนครบแล้วครับ 😊' : 'เข้าฐานโจทย์เก็บคะแนน'}</p>
+                   <p className="text-slate-400 text-sm md:text-lg text-center">{hasPlayedClassroomToday() ? 'วันนี้คุณเล่นเก็บคะแนนครบแล้วครับ 😊' : 'เก็บคะแนนจริงจัง (10 ข้อ)'}</p>
                 </button>
     
                 <button onClick={() => { setGameMode('FREEPLAY'); setScreen('THEME_SELECT'); }} className="group relative bg-slate-800 p-8 md:p-12 rounded-[40px] border-4 border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105 shadow-2xl overflow-hidden active:scale-95">
                    <Gamepad2 className="text-cyan-400 mb-4 md:mb-6 mx-auto group-hover:-rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" size={80} />
                    <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">เล่นตามใจ</h2>
-                   <p className="text-slate-400 text-sm md:text-lg text-center">สุ่มโจทย์จากคลังมหาสนุก</p>
+                   <p className="text-slate-400 text-sm md:text-lg text-center">ฝึกฝนฝีมือ (ไม่จำกัด)</p>
                 </button>
               </div>
-              <button onClick={() => setScreen('LOGIN')} className="mt-10 md:mt-16 text-slate-500 underline font-bold hover:text-white transition-colors text-lg">ออกจากระบบ</button>
+              <button onClick={() => setScreen('GAME_TYPE_SELECT')} className="mt-10 md:mt-16 text-slate-500 underline font-bold hover:text-white transition-colors text-lg">ย้อนกลับ</button>
             </div>
           )}
 
@@ -307,7 +341,6 @@ export function App() {
                   {THEMES.map((theme) => {
                       const bgUrl = themeBackgrounds[theme.id];
                       const hasCustomBg = bgUrl && bgUrl.trim() !== '';
-                      // [แก้ไข] เช็คว่าเป็นวิดีโอไหม
                       const isVideo = hasCustomBg && (bgUrl.toLowerCase().endsWith('.mp4') || bgUrl.toLowerCase().includes('#.mp4'));
 
                       return (
@@ -392,32 +425,62 @@ export function App() {
     }
 
     if (screen === 'GAME' && selectedTheme) {
-      return (
-        <GameBoard 
-            players={gamePlayers} 
-            currentPlayerIndex={0} 
-            theme={selectedTheme} 
-            gameMode={gameMode} 
-            questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()} 
-            onTurnComplete={(p) => setGamePlayers(p)} 
-            onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
-            onGameEnd={() => { 
-                if (currentStudentId) {
-                  StorageService.addSession(currentStudentId, { 
-                      sessionId: Date.now().toString(), 
-                      date: new Date().toISOString().split('T')[0], 
-                      timestamp: new Date().toISOString(), 
-                      score: gamePlayers[0].score, 
-                      mode: gameMode, 
-                      details: sessionDetails 
-                  });
-                }
-                setScreen('RETURNING'); 
-                setSelectedTheme(null); 
-            }} 
-            onExit={() => setScreen('RETURNING')} 
-        />
-      );
+      if (gameType === 'RALLY') {
+          return (
+             <SmartBoard 
+                player={gamePlayers[0]}
+                theme={selectedTheme}
+                questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()}
+                onGameEnd={(dist, score) => {
+                    if (currentStudentId) {
+                        StorageService.addSession(currentStudentId, { 
+                            sessionId: Date.now().toString(), 
+                            date: new Date().toISOString().split('T')[0], 
+                            timestamp: new Date().toISOString(), 
+                            score: score, 
+                            realScore: dist, 
+                            bonusScore: 0,
+                            mode: gameMode, 
+                            details: sessionDetails,
+                            gameType: 'RALLY', 
+                            totalDistance: dist
+                        });
+                      }
+                      setScreen('RETURNING'); 
+                      setSelectedTheme(null);
+                }}
+                onExit={() => setScreen('RETURNING')}
+             />
+          );
+      } else {
+          return (
+            <GameBoard 
+                players={gamePlayers} 
+                currentPlayerIndex={0} 
+                theme={selectedTheme} 
+                gameMode={gameMode} 
+                questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()} 
+                onTurnComplete={(p) => setGamePlayers(p)} 
+                onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
+                onGameEnd={() => { 
+                    if (currentStudentId) {
+                    StorageService.addSession(currentStudentId, { 
+                        sessionId: Date.now().toString(), 
+                        date: new Date().toISOString().split('T')[0], 
+                        timestamp: new Date().toISOString(), 
+                        score: gamePlayers[0].score, 
+                        mode: gameMode, 
+                        details: sessionDetails,
+                        gameType: 'CLASSIC'
+                    });
+                    }
+                    setScreen('RETURNING'); 
+                    setSelectedTheme(null); 
+                }} 
+                onExit={() => setScreen('RETURNING')} 
+            />
+          );
+      }
     }
 
     return null;

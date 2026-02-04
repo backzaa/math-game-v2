@@ -4,6 +4,7 @@ export type SkinColor = '#fca5a5' | '#fcd34d' | '#8d5524' | '#e0ac69';
 export type CharacterType = 'ASTRONAUT' | 'ALIEN' | 'SUPERHERO' | 'NINJA' | 'PRINCESS';
 export type TileType = 'START' | 'FINISH' | 'NORMAL' | 'QUESTION' | 'TREASURE' | 'TRAP';
 export type ScoringMode = 'CLASSROOM' | 'FREEPLAY'; 
+export type GameType = 'CLASSIC' | 'RALLY'; // [เพิ่ม] ประเภทเกม
 export type Gender = 'MALE' | 'FEMALE';
 export type ThemeId = 'SPACE' | 'JUNGLE' | 'OCEAN' | 'VOLCANO' | 'CANDY' | 'PIRATE' | 'CITY' | 'DESERT' | 'CASTLE' | 'SKY' | 'WINTER' | 'FARM';
 
@@ -43,9 +44,11 @@ export interface GameSession {
     details: QuestionDetail[]; 
     isManual?: boolean;
     note?: string;
-    // [เพิ่ม] รองรับข้อมูลจาก Google Sheets
     realScore?: number;
     bonusScore?: number;
+    // [เพิ่ม] ข้อมูลสำหรับเกมแบบ Rally
+    gameType?: GameType;
+    totalDistance?: number;
 }
 
 export interface StudentProfile {
@@ -96,7 +99,7 @@ export interface DailyQuestionSet {
 }
 
 export interface GameGlobalConfig {
-    themeBackgrounds: Record<string, string>; 
+    themeBackgrounds: Record<string, string>;
     bgmPlaylist: string[];
-    menuPlaylist?: string[];    // [เพิ่มใหม่] เพลงตอนอยู่หน้าเมนู
+    menuPlaylist: string[];
 }
