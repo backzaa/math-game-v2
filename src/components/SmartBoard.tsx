@@ -37,7 +37,7 @@ export const SmartBoard: React.FC<Props> = ({
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [currentScore, setCurrentScore] = useState(player.score);
   
-  // Video Control (เริ่มต้นเป็น null เพื่อให้ useEffect ทำงานเมื่อเริ่มเกม)
+  // Video Control
   const [currentVideo, setCurrentVideo] = useState<string | null>(null);
   const [isLooping, setIsLooping] = useState(false);
   
@@ -80,20 +80,22 @@ export const SmartBoard: React.FC<Props> = ({
   const handleStartGame = () => {
       setGameState('PLAYING_VIDEO');
       setCurrentVideo(VIDEOS.IDLE);
-      setIsLooping(false); 
+      setIsLooping(false); // IDLE เล่นรอบเดียว
   };
 
   const handleVideoEnded = () => {
+      // Logic การจบวิดีโอแต่ละประเภท
       if (currentVideo === VIDEOS.IDLE) {
-          // IDLE จบ -> ต่อด้วย RUN (Loop) + แสดงโจทย์
+          // IDLE จบ -> เข้าสู่ RUN (Loop) + แสดงโจทย์
           startRunPhase();
       } 
       else if (currentVideo === VIDEOS.SPRINT || currentVideo === VIDEOS.FALL) {
-          // Action จบ -> เช็คว่าจบเกมหรือยัง
+          // Action จบ -> เช็คจบเกม
           if (currentQuestionIdx >= 10) {
               setCurrentVideo(VIDEOS.FINISH);
               setIsLooping(false);
           } else {
+              // ยังไม่จบ -> กลับไปวิ่ง RUN (Loop) + โจทย์ใหม่
               startRunPhase();
           }
       }
@@ -105,10 +107,17 @@ export const SmartBoard: React.FC<Props> = ({
   };
 
   const startRunPhase = () => {
+      // 1. เปลี่ยนวิดีโอเป็น RUN
       setCurrentVideo(VIDEOS.RUN);
-      setIsLooping(true); // วิ่งวนรอ
+      // 2. สั่งให้ Loop
+      setIsLooping(true);
       
-      // หน่วงเวลา 0.5s ให้ภาพวิ่งขึ้นก่อนค่อยโชว์โจทย์
+      // 3. บังคับ Play เพื่อความชัวร์
+      if (videoRef.current) {
+          videoRef.current.play().catch(e => console.log("Run video play error:", e));
+      }
+      
+      // 4. รอสักครู่ค่อยแสดงโจทย์
       setTimeout(() => {
           showNextQuestion();
       }, 500); 
@@ -121,22 +130,21 @@ export const SmartBoard: React.FC<Props> = ({
   };
 
   const handleAnswer = (correct: boolean) => {
-      setActiveQuestion(null); 
-      // ยังไม่เปลี่ยน Video ทันที (ให้เห็นภาพวิ่งวนไปก่อน)
+      setActiveQuestion(null); // ปิดโจทย์
       
       setCurrentQuestionIdx(prev => prev + 1);
 
       if (correct) {
           playSfx(SFX.CORRECT);
           setCurrentScore(prev => prev + 10);
-          // ตอบถูก -> รอทอยเต๋า
+          // ตอบถูก -> รอทอยเต๋า (วิดีโอ RUN ยังเล่นวนต่อไป)
           setGameState('WAITING_TO_ROLL');
       } else {
           playSfx(SFX.WRONG);
-          // ตอบผิด -> ล้มทันที
-          setGameState('PLAYING_VIDEO');
+          // ตอบผิด -> ตัดเข้า Fall ทันที
           setIsLooping(false);
           setCurrentVideo(VIDEOS.FALL);
+          setGameState('PLAYING_VIDEO');
       }
   };
 
@@ -162,18 +170,20 @@ export const SmartBoard: React.FC<Props> = ({
       setDisplayNumber(bonusDist);
       setTotalDistance(prev => prev + bonusDist);
       
-      setGameState('PLAYING_VIDEO');
+      // เริ่มวิ่งเร็ว Sprint
       setIsLooping(false);
       setCurrentVideo(VIDEOS.SPRINT);
+      setGameState('PLAYING_VIDEO');
   };
 
+  // พลังงานลดลง (10 เต็ม 10 -> ลดทีละ 1)
   const energyLeft = Math.max(0, 10 - currentQuestionIdx); 
   const energyPercent = (energyLeft / 10) * 100;
 
   // --- UI COMPONENTS ---
 
   const TopProfileSection = () => (
-      <div className={`w-full h-full bg-slate-800 border-b-4 border-slate-700 flex flex-col items-center justify-center relative p-2`}>
+      <div className="w-full h-full bg-slate-800 border-b-4 border-slate-700 flex flex-col items-center justify-center relative p-2">
           <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full border-4 border-white bg-slate-700 shadow-lg overflow-hidden relative">
                   {player.profileImage ? (
@@ -193,8 +203,12 @@ export const SmartBoard: React.FC<Props> = ({
           <button onClick={() => setShowSettings(!showSettings)} className="absolute top-2 right-2 bg-slate-700 p-2 rounded-full text-white hover:bg-slate-600 transition"><Settings size={16} /></button>
           {showSettings && (
               <div className="absolute top-10 right-2 bg-slate-900/95 p-4 rounded-xl border border-slate-600 w-40 text-white z-50 shadow-xl">
-                  <div className="text-xs mb-2">BGM <input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={e=>setBgmVolume(parseFloat(e.target.value))} className="w-full"/></div>
-                  <div className="text-xs">SFX <input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={e=>setSfxVolume(parseFloat(e.target.value))} className="w-full"/></div>
+                  <div className="text-xs mb-2">
+                    BGM <input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full"/>
+                  </div>
+                  <div className="text-xs">
+                    SFX <input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full"/>
+                  </div>
               </div>
           )}
       </div>
@@ -250,14 +264,13 @@ export const SmartBoard: React.FC<Props> = ({
       </div>
   );
 
-  // ส่วนแสดงวิดีโอ
   const VideoDisplay = () => (
       <div className="w-full h-full relative bg-black flex items-center justify-center overflow-hidden shadow-inner z-10">
           <video 
               ref={videoRef}
               className="w-full h-full object-cover"
               onEnded={handleVideoEnded}
-              loop={isLooping}
+              loop={isLooping} 
               muted={false}
               playsInline
               onContextMenu={(e) => e.preventDefault()}
