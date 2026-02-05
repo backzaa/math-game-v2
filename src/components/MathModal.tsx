@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import type { MathQuestion } from '../types'; 
-// ลบบรรทัด import MathModal ออกไปแล้ว
 import { Calculator, CheckCircle2, XCircle, Delete } from 'lucide-react';
 
 interface Props {
@@ -89,15 +88,17 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
 
   // --- Styles แยกตามโหมด ---
   const overlayClass = compact 
-    ? "fixed inset-0 z-[1000] flex items-end justify-center pb-10 pointer-events-none" 
+    // ใช้ pb-4 เพื่อดันลงล่างสุด
+    ? "fixed inset-0 z-[1000] flex items-end justify-center pb-4 pointer-events-none" 
     : "fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 animate-pop-in";
 
   const containerClass = compact
-    ? "bg-slate-900/80 rounded-3xl border-2 border-yellow-400/50 w-full max-w-lg p-4 relative shadow-2xl backdrop-blur-md pointer-events-auto mb-4 mx-4 animate-slide-up"
+    // [แก้ไขจุดที่ 1] ปรับความกว้าง w-[80%] และเพิ่ม py-8 (สูงขึ้น) และ translate-x-12 (ขยับขวา)
+    ? "bg-slate-900/80 rounded-3xl border-2 border-yellow-400/50 w-[80%] max-w-sm px-4 py-8 relative shadow-2xl backdrop-blur-md pointer-events-auto animate-slide-up translate-x-12"
     : "bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl";
 
   const questionTextClass = compact
-    ? "text-3xl md:text-4xl font-mono text-white font-bold tracking-wider"
+    ? "text-3xl font-mono text-white font-bold tracking-wider"
     : "text-5xl md:text-6xl font-mono text-white font-bold tracking-wider";
 
   const optionBtnClass = compact
@@ -135,7 +136,8 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
        <div className={containerClass}>
           <div className="mb-4 text-center">
             {!compact && <h2 className="text-2xl text-slate-400 font-bold mb-4">คำถามคณิตศาสตร์</h2>}
-            <div className={`rounded-2xl border border-slate-500/50 ${compact ? 'bg-black/30 p-3' : 'bg-black/40 p-6'}`}>
+            {/* [แก้ไขจุดที่ 2] เพิ่ม Padding ของโจทย์เป็น p-6 ให้ดูสูงขึ้น */}
+            <div className={`rounded-2xl border border-slate-500/50 ${compact ? 'bg-black/30 p-6' : 'bg-black/40 p-6'}`}>
                  <span className={questionTextClass}>{question.question} = ?</span>
             </div>
           </div>
