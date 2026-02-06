@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { MathQuestion } from '../types'; 
+import type { MathQuestion } from '../types';
 import { Calculator, CheckCircle2, XCircle, Delete } from 'lucide-react';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   volume: number;
   calculatorUsesLeft: number;
   onConsumeCalculator: () => void;
-  compact?: boolean; // [สวิตช์] ถ้า true = โหมดเล็ก
+  compact?: boolean;
 }
 
 const SFX = {
@@ -35,7 +35,7 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH'; 
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        utterance.rate = isMobile ? 1.0 : 0.8; 
+        utterance.rate = isMobile ? 1.0 : 0.8;
         utterance.volume = 1.0;
         window.speechSynthesis.speak(utterance);
     }
@@ -48,7 +48,6 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
     
     playSound(isCorrect);
     setFeedback({ isCorrect, show: true });
-    
     if (isCorrect) speak("เก่งมาก ถูกต้องครับ");
     else speak(`ผิดนิดนึง คำตอบคือ ${question.answer} ครับ`); 
     
@@ -58,7 +57,7 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
       setShowCalculator(false);
       setUsedCalcInThisQuestion(false);
       setCalcDisplay('0');
-    }, 2000); 
+    }, 2000);
   };
 
   const activateCalculator = () => {
@@ -72,13 +71,13 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
       else if(val === 'DEL') setCalcDisplay(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
       else if(val === '=') {
           if (!usedCalcInThisQuestion) {
-              onConsumeCalculator(); 
+              onConsumeCalculator();
               setUsedCalcInThisQuestion(true);
           }
           try { 
               const expression = calcDisplay.replace(/×/g, '*').replace(/÷/g, '/');
               // eslint-disable-next-line no-eval
-              const result = eval(expression); 
+              const result = eval(expression);
               setCalcDisplay(Number.isInteger(result) ? result.toString() : result.toFixed(2)); 
           } catch(e) { setCalcDisplay('Error'); }
       } else {
@@ -86,29 +85,25 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
       }
   };
 
-  // --- Styles แยกตามโหมด ---
   const overlayClass = compact 
-    // ใช้ pb-4 เพื่อดันลงล่างสุด
-    ? "fixed inset-0 z-[1000] flex items-end justify-center pb-4 pointer-events-none" 
+    ? "fixed inset-0 z-[1000] flex items-end justify-center pb-6 pointer-events-none" 
     : "fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 animate-pop-in";
-
+  
   const containerClass = compact
-    // [แก้ไขจุดที่ 1] ปรับความกว้าง w-[80%] และเพิ่ม py-8 (สูงขึ้น) และ translate-x-12 (ขยับขวา)
-    ? "bg-slate-900/80 rounded-3xl border-2 border-yellow-400/50 w-[80%] max-w-sm px-4 py-8 relative shadow-2xl backdrop-blur-md pointer-events-auto animate-slide-up translate-x-12"
+    ? "bg-slate-900/90 rounded-t-3xl rounded-b-xl border-2 border-yellow-400/50 w-[95%] max-w-sm px-4 py-6 relative shadow-[0_-10px_40px_rgba(0,0,0,0.8)] backdrop-blur-md pointer-events-auto animate-slide-up mx-auto mb-2"
     : "bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl";
-
+  
   const questionTextClass = compact
     ? "text-3xl font-mono text-white font-bold tracking-wider"
     : "text-5xl md:text-6xl font-mono text-white font-bold tracking-wider";
-
+  
   const optionBtnClass = compact
-    ? "bg-white/90 hover:bg-white text-slate-900 text-xl font-bold py-3 rounded-xl shadow border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 transition-all"
+    ? "bg-white/90 hover:bg-white text-slate-900 text-xl font-bold py-4 rounded-xl shadow border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 transition-all"
     : "bg-white hover:bg-blue-50 active:scale-95 text-slate-900 text-4xl md:text-5xl font-bold py-6 rounded-2xl shadow-[0_6px_0_#cbd5e1] border-2 border-slate-300 transition-all hover:-translate-y-1";
 
   return (
     <div className={overlayClass}>
       
-      {/* Feedback Overlay */}
       {feedback.show && (
         <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
            <div className={`p-8 rounded-3xl text-center border-4 shadow-2xl flex flex-col items-center gap-4 scale-110 animate-pop-in ${feedback.isCorrect ? 'bg-green-600 border-green-400' : 'bg-red-600 border-red-400'}`}>
@@ -136,8 +131,7 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
        <div className={containerClass}>
           <div className="mb-4 text-center">
             {!compact && <h2 className="text-2xl text-slate-400 font-bold mb-4">คำถามคณิตศาสตร์</h2>}
-            {/* [แก้ไขจุดที่ 2] เพิ่ม Padding ของโจทย์เป็น p-6 ให้ดูสูงขึ้น */}
-            <div className={`rounded-2xl border border-slate-500/50 ${compact ? 'bg-black/30 p-6' : 'bg-black/40 p-6'}`}>
+            <div className={`rounded-2xl border border-slate-500/50 ${compact ? 'bg-black/40 p-4' : 'bg-black/40 p-6'}`}>
                  <span className={questionTextClass}>{question.question} = ?</span>
             </div>
           </div>
@@ -150,11 +144,11 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
             ))}
           </div>
           
-          <div className={`flex justify-center ${compact ? 'absolute -top-6 right-0' : 'border-t border-slate-700 pt-6'}`}>
+          <div className={`flex justify-center ${compact ? 'absolute -top-12 right-0' : 'border-t border-slate-700 pt-6'}`}>
               <button 
                 disabled={calculatorUsesLeft <= 0 && !usedCalcInThisQuestion} 
                 onClick={activateCalculator} 
-                className={`group ${compact ? 'scale-75 hover:scale-90 transition' : 'flex flex-col items-center gap-2 hover:scale-105 transition'} ${calculatorUsesLeft <= 0 && !usedCalcInThisQuestion ? 'opacity-30 grayscale cursor-not-allowed' : ''}`}
+                className={`group ${compact ? 'scale-90 hover:scale-100 transition' : 'flex flex-col items-center gap-2 hover:scale-105 transition'} ${calculatorUsesLeft <= 0 && !usedCalcInThisQuestion ? 'opacity-30 grayscale cursor-not-allowed' : ''}`}
               >
                   <div className="w-16 h-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg group-hover:shadow-orange-500/50 border-4 border-orange-400 relative">
                       <Calculator color="white" size={32}/>
@@ -168,12 +162,12 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
                   </div>}
               </button>
           </div>
-
+        
           {showCalculator && (
               <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm pointer-events-auto">
                   <div className="w-[260px] bg-slate-800 rounded-[25px] p-3 flex flex-col border-4 border-orange-400 shadow-2xl animate-pop-in">
                       <div className="bg-[#d4e0b3] p-2 rounded-xl mb-3 border-4 border-slate-600 shadow-inner h-16 flex items-end justify-end overflow-hidden">
-                          <div className="text-slate-800 font-mono text-3xl font-black tracking-widest">{calcDisplay}</div>
+                         <div className="text-slate-800 font-mono text-3xl font-black tracking-widest">{calcDisplay}</div>
                       </div>
                       <div className="grid grid-cols-4 gap-2 mb-2">
                           <button onClick={()=>handleCalcInput('C')} className="aspect-square bg-red-400 hover:bg-red-300 text-white font-black rounded-xl shadow-[0_3px_0_#991b1b] active:translate-y-[2px] active:shadow-none text-lg">C</button>
