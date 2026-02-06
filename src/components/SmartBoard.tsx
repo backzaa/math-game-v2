@@ -30,7 +30,7 @@ const VIDEO_SOURCES = {
 
 type RunnerState = keyof typeof VIDEO_SOURCES;
 
-// --- Video Component (VideoLayer) ---
+// --- Video Component ---
 const VideoLayer = ({ 
     stateKey, 
     activeState, 
@@ -48,7 +48,10 @@ const VideoLayer = ({
         if (videoRef.current) {
             if (isActive) {
                 videoRef.current.currentTime = 0;
-                videoRef.current.play().catch(() => {});
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {});
+                }
             } else {
                 videoRef.current.pause(); 
             }
@@ -67,7 +70,7 @@ const VideoLayer = ({
                     onVideoEnd();
                 }
             }}
-            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity duration-700 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity duration-500 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
         />
     );
 };
@@ -84,7 +87,9 @@ export const SmartBoard: React.FC<Props> = ({
   
   const [visualEnergy, setVisualEnergy] = useState(10); 
   const [runnerState, setRunnerState] = useState<RunnerState>('IDLE');
+  
   const [gameState, setGameState] = useState<'READY' | 'PLAYING' | 'QUIZ' | 'ROLL' | 'MOVING' | 'FINISHED'>('READY');
+  
   const [displayNumber, setDisplayNumber] = useState(1);
   const [isSpinning, setIsSpinning] = useState(false);
   const spinIntervalRef = useRef<any>(null);
@@ -95,71 +100,44 @@ export const SmartBoard: React.FC<Props> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
 
-  // --- GAME LOGIC (Keep Original) ---
+  // Lock กันการรันซ้ำ
+  const processingRef = useRef(false);
+
+  // --- GAME LOGIC ---
 
   const handleStartGame = () => {
       setHasInteracted(true);
       setGameState('PLAYING');
       setRunnerState('IDLE');
       setVisualEnergy(10); 
+      setCurrentQuestionIdx(0);
+      processingRef.current = false;
   };
 
-  const prepareNextQuestion = () => {
-      if (currentQuestionIdx >= 10) {
-          return;
-      }
+  const showQuestion = () => {
       setGameState('QUIZ');
-      setRunnerState('RUN'); 
       const q = questions[currentQuestionIdx] || {id:'err', question:'1+1', answer:2, options:[1,2,3,4]};
       setActiveQuestion(q);
   };
 
   const handleAnswer = (correct: boolean) => {
       setActiveQuestion(null);
+      // ลดพลังงานลง 1
       setVisualEnergy(prev => Math.max(0, prev - 1));
 
       if (correct) {
           playSfx(SFX.SPRINT);
           setCurrentScore(prev => prev + 10);
-          setGameState('ROLL'); 
+          setGameState('ROLL'); // ไปหน้าทอยเต๋า -> รอ user กด -> startSprint
           setRunnerState('RUN'); 
       } else {
           playSfx(SFX.FALL);
-          setRunnerState('FALL'); 
           setGameState('MOVING'); 
+          setRunnerState('FALL'); // เล่นวิดีโอล้มเลย
       }
   };
 
-  const handleVideoFinish = () => {
-      const isLastQuestion = currentQuestionIdx >= 9;
-      if (runnerState === 'IDLE') {
-          prepareNextQuestion();
-          setRunnerState('RUN');
-      }
-      else if (runnerState === 'SPRINT') {
-          if (distanceIntervalRef.current) clearInterval(distanceIntervalRef.current);
-          if (isLastQuestion) {
-              setRunnerState('FINISHED');
-          } else {
-              setRunnerState('RUN'); 
-              setTimeout(prepareNextQuestion, 500);
-          }
-      } 
-      else if (runnerState === 'FALL') {
-          if (isLastQuestion) {
-              setRunnerState('FINISHED');
-          } else {
-              setRunnerState('RUN');
-              setCurrentQuestionIdx(prev => prev + 1); 
-              setTimeout(prepareNextQuestion, 500);
-          }
-      }
-      else if (runnerState === 'FINISHED') {
-          finishGame();
-      }
-  };
-
-  const handleDiceRoll = () => {
+  const handleManualRoll = () => {
       if (gameState !== 'ROLL') return;
       
       playSfx(SFX.CLICK);
@@ -170,11 +148,9 @@ export const SmartBoard: React.FC<Props> = ({
 
       setTimeout(() => {
           if (spinIntervalRef.current) clearInterval(spinIntervalRef.current);
-          
           const finalDice = Math.floor(Math.random() * 6) + 1; 
           setDisplayNumber(finalDice);
           setIsSpinning(false);
-          
           startSprint(finalDice);
       }, 1500);
   };
@@ -185,10 +161,39 @@ export const SmartBoard: React.FC<Props> = ({
       playSfx(SFX.SPRINT);
       const distanceToAdd = diceValue * 10; 
       const targetDistance = totalDistance + distanceToAdd;
-
       animateDistanceVisual(targetDistance);
-      if (currentQuestionIdx < 9) {
-          setCurrentQuestionIdx(prev => prev + 1);
+  };
+
+  // --- Core Loop Logic ---
+  const handleVideoFinish = () => {
+      // **ป้องกันการรันซ้ำ (Double Firing Prevention)**
+      if (processingRef.current) return;
+      processingRef.current = true;
+      // ปลดล็อกหลังจากผ่านไปเล็กน้อย
+      setTimeout(() => { processingRef.current = false; }, 500);
+
+      if (runnerState === 'IDLE') {
+          // จบ Intro -> เริ่มข้อแรก
+          setRunnerState('RUN');
+          setTimeout(showQuestion, 1000);
+      }
+      else if (runnerState === 'SPRINT' || runnerState === 'FALL') {
+          // จบ Action (วิ่ง/ล้ม)
+          // เช็คว่าตอนนี้ทำข้อที่เท่าไหร่ (0-9)
+          if (currentQuestionIdx < 9) {
+              // ยังไม่ครบ 10 ข้อ (ข้อ 9 คือข้อที่ 10) -> ไปข้อต่อไป
+              setCurrentQuestionIdx(prev => prev + 1);
+              setRunnerState('RUN'); 
+              setTimeout(showQuestion, 1000);
+          } else {
+              // ครบ 10 ข้อแล้ว -> เล่นฉากจบ
+              // จังหวะนี้ visualEnergy ควรเป็น 0 แล้ว
+              setRunnerState('FINISHED');
+          }
+      }
+      else if (runnerState === 'FINISHED') {
+          // จบฉากเข้าเส้นชัย -> สรุปคะแนน
+          finishGame();
       }
   };
 
@@ -208,7 +213,6 @@ export const SmartBoard: React.FC<Props> = ({
 
   const finishGame = () => {
       setGameState('FINISHED');
-      setRunnerState('FINISHED');
       playSfx(SFX.WIN);
       confetti();
   };
@@ -221,23 +225,26 @@ export const SmartBoard: React.FC<Props> = ({
 
   const energyPercent = (visualEnergy / 10) * 100;
 
-  // --- REUSABLE UI COMPONENTS (ดีไซน์เดิม) ---
+  // --- UI COMPONENTS ---
   
-  const TopProfileSection = () => (
-      <div className="w-full h-full bg-slate-800 border-b-4 border-slate-700 flex flex-col items-center justify-center p-2 relative">
-          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-white bg-slate-700 shadow-lg overflow-hidden mb-2">
+  const TopProfileSection = ({ mobileMode = false }) => (
+      <div className={`w-full h-full bg-slate-800 border-b-4 border-slate-700 flex ${mobileMode ? 'flex-row px-4 justify-start' : 'flex-col justify-center'} items-center p-2 relative gap-4`}>
+          <div className="w-16 h-16 rounded-full border-4 border-white bg-slate-700 shadow-lg overflow-hidden shrink-0">
               {player.profileImage ? (
                   <img src={player.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                   <CharacterSvg type={player.appearance?.base === 'BOY' ? (theme.player1Char as import('../types').CharacterType) : (theme.player2Char as import('../types').CharacterType)} className="w-full h-full" appearance={player.appearance} />
               )}
           </div>
-          <h2 className="text-xl font-bold text-white truncate max-w-full">{player.nickname || player.firstName}</h2>
-          <div className="bg-slate-900/50 rounded-full px-4 py-1 mt-1 flex items-center gap-2 border border-slate-600">
-              <Star size={14} className="text-yellow-400 fill-yellow-400"/>
-              <span className="text-sm text-yellow-100 font-bold">{currentScore} คะแนน</span>
+          <div className={`${mobileMode ? 'text-left' : 'text-center'}`}>
+              <h2 className="text-xl font-bold text-white truncate max-w-[150px]">{player.nickname || player.firstName}</h2>
+              <div className="bg-slate-900/50 rounded-full px-4 py-1 mt-1 flex items-center gap-2 border border-slate-600 w-fit">
+                  <Star size={14} className="text-yellow-400 fill-yellow-400"/>
+                  <span className="text-sm text-yellow-100 font-bold">{currentScore} คะแนน</span>
+              </div>
           </div>
-          <div className="absolute top-2 right-2">
+          
+          <div className="absolute top-2 right-2 md:top-2 md:right-2">
               <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-700 p-2 rounded-full text-white hover:bg-slate-600 transition"><Settings size={16} /></button>
           </div>
           {showSettings && (
@@ -258,7 +265,7 @@ export const SmartBoard: React.FC<Props> = ({
           <div className="text-4xl font-black text-white mb-2 drop-shadow-md">
               {visualEnergy} <span className="text-xl text-slate-400">/ 10</span>
           </div>
-          <div className="w-full max-w-[80%] bg-slate-900 h-4 md:h-6 rounded-full overflow-hidden border-2 border-slate-600 shadow-inner">
+          <div className="w-full max-w-[90%] bg-slate-900 h-4 md:h-6 rounded-full overflow-hidden border-2 border-slate-600 shadow-inner">
               <div 
                   className={`h-full transition-all duration-500 ease-out ${visualEnergy > 5 ? 'bg-green-500' : visualEnergy > 2 ? 'bg-orange-500' : 'bg-red-500'}`}
                   style={{ width: `${energyPercent}%` }}
@@ -268,20 +275,20 @@ export const SmartBoard: React.FC<Props> = ({
   );
 
   const BottomActionSection = () => (
-      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-4 gap-4">
+      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-2 gap-2 md:gap-4">
           <div className="text-center">
-              <div className="text-xs text-indigo-400 uppercase font-bold tracking-wider flex items-center justify-center gap-2">
+              <div className="text-[10px] md:text-xs text-indigo-400 uppercase font-bold tracking-wider flex items-center justify-center gap-2">
                   <Footprints size={14} /> ระยะทางรวม
               </div>
-              <div className="text-3xl font-black text-white drop-shadow-glow">
+              <div className="text-2xl md:text-3xl font-black text-white drop-shadow-glow">
                   {totalDistance} <span className="text-sm font-normal text-slate-400">เมตร</span>
               </div>
           </div>
 
           <button 
-              onClick={handleDiceRoll}
+              onClick={handleManualRoll}
               disabled={gameState !== 'ROLL' || isSpinning}
-              className={`w-full py-4 rounded-xl text-xl font-bold shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
+              className={`w-full py-2 md:py-4 rounded-xl text-lg md:text-xl font-bold shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
                   ${gameState === 'ROLL' 
                       ? 'bg-green-500 hover:bg-green-400 border-b-4 border-green-700 text-white animate-bounce cursor-pointer' 
                       : 'bg-slate-700 border-b-4 border-slate-900 text-slate-500 cursor-not-allowed opacity-50 grayscale'
@@ -290,7 +297,7 @@ export const SmartBoard: React.FC<Props> = ({
               {isSpinning ? (
                   <Dices className="animate-spin mr-2"/>
               ) : gameState === 'ROLL' ? (
-                  <>🎲 กดสุ่มระยะทาง!</>
+                  <>🎲 กดสุ่ม!</>
               ) : (
                   <>🔒 รอปลดล็อค</>
               )}
@@ -304,8 +311,8 @@ export const SmartBoard: React.FC<Props> = ({
       
       {/* --- READY OVERLAY --- */}
       {!hasInteracted && (
-        <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in">
-            <div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg mx-4">
+        <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in px-4">
+            <div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg w-full">
                 <h1 className="text-3xl md:text-4xl font-black text-white mb-6">พร้อมผจญภัยหรือยัง?</h1>
                 <p className="text-slate-300 mb-8 text-lg">ภารกิจ: บริหารพลังงานให้ครบ 10 ข้อ!</p>
                 <button onClick={handleStartGame} className="bg-green-600 hover:bg-green-500 text-white text-xl md:text-2xl font-bold px-8 py-4 md:px-12 md:py-6 rounded-full shadow-lg flex items-center gap-3 mx-auto animate-bounce hover:scale-110 transition">
@@ -320,11 +327,11 @@ export const SmartBoard: React.FC<Props> = ({
           
           {/* Top 20% */}
           <div className="h-[20%] w-full relative z-30">
-              <TopProfileSection />
+              <TopProfileSection mobileMode={true} />
               <button onClick={onExit} className="absolute top-2 left-2 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
           </div>
 
-          {/* Middle 55% */}
+          {/* Middle 55% (Video) */}
           <div className="h-[55%] w-full relative z-10 bg-black">
               <VideoLayer stateKey="IDLE" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <VideoLayer stateKey="RUN" activeState={runnerState} />
@@ -333,8 +340,8 @@ export const SmartBoard: React.FC<Props> = ({
               <VideoLayer stateKey="FINISHED" activeState={runnerState} onVideoEnd={handleVideoFinish} />
           </div>
 
-          {/* Bottom 25% (Energy & Action Side-by-Side for better fit) */}
-          <div className="h-[25%] w-full bg-slate-900 border-t-4 border-slate-700 flex p-1 relative z-30">
+          {/* Bottom 25% (Energy & Action Side-by-Side) */}
+          <div className="h-[25%] w-full bg-slate-900 border-t-4 border-slate-700 flex relative z-30">
               <div className="w-1/2 border-r border-slate-700"><MiddleEnergySection /></div>
               <div className="w-1/2"><BottomActionSection /></div>
           </div>
@@ -355,8 +362,8 @@ export const SmartBoard: React.FC<Props> = ({
 
           {/* Sidebar (25%) */}
           <div className="w-[25%] h-full bg-slate-900 border-l-4 border-slate-700 flex flex-col shadow-2xl relative z-20">
-              <div className="flex-[0.25]"><TopProfileSection /></div>
-              <div className="flex-[0.4]"><MiddleEnergySection /></div>
+              <div className="flex-[0.25] border-b-4 border-slate-700"><TopProfileSection /></div>
+              <div className="flex-[0.4] border-b-4 border-slate-700"><MiddleEnergySection /></div>
               <div className="flex-[0.35]"><BottomActionSection /></div>
           </div>
       </div>
@@ -369,14 +376,14 @@ export const SmartBoard: React.FC<Props> = ({
             volume={sfxVolume} 
             calculatorUsesLeft={2}
             onConsumeCalculator={()=>{}}
-            compact={true} // Mobile = true
+            compact={true} 
           />
       )}
 
       {/* สรุปผล */}
       {gameState === 'FINISHED' && (
          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[2000] animate-fade-in px-4">
-             <div className="text-center p-8 bg-slate-800 rounded-3xl border-4 border-yellow-500 shadow-2xl max-w-sm w-full relative">
+             <div className="text-center p-8 bg-slate-900/90 rounded-3xl border-4 border-yellow-500 shadow-2xl backdrop-blur-md max-w-sm w-full relative transform scale-110">
                 <Trophy size={100} className="text-yellow-400 mx-auto mb-6 animate-bounce" />
                 <h1 className="text-4xl font-black text-white mb-2">จบเกม!</h1>
                 <div className="bg-black/50 p-6 rounded-2xl border border-yellow-500/30 mb-8 mt-4">
