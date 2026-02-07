@@ -281,22 +281,18 @@ export function App() {
   const handleSelectSong = (index: number) => { setCurrentSongIndex(index); setIsPlaying(true); setShowMusicMenu(false); setAudioError(false); };
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
-  // --- [เพิ่ม] ฟังก์ชัน selectMode ที่คุณแจ้งว่าหาไม่เจอ เพื่อจัดการ Logic การเข้าเกม ---
   const selectMode = (mode: ScoringMode) => {
       setGameMode(mode);
       
-      // ถ้าเลือกแข่งระยะทาง (RALLY) -> ให้เริ่มเกมเลย (ข้ามหน้าเลือกด่าน)
       if (gameType === 'RALLY') {
-          // ใช้ Theme Default เพื่อไม่ให้ Error (แต่ชื่อจะถูก Override ใน TravelTransition)
           const defaultTheme = THEMES.find(t => t.id === 'jungle') || THEMES[0];
           
           localStorage.removeItem('math_game_session_players');
           localStorage.removeItem('math_game_session_index');
 
           setSelectedTheme(defaultTheme);
-          setScreen('TRAVELING'); // ไปหน้าโหลดทันที
+          setScreen('TRAVELING'); 
 
-          // เตรียมข้อมูลผู้เล่น
           const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
           setGamePlayers([{
               ...(s || {
@@ -314,10 +310,9 @@ export function App() {
               calculatorUsesLeft: mode === 'FREEPLAY' ? 2 : 0, 
               isFinished:false
           }]); 
-          setSessionDetails([]);
+          setSessionDetails([]); 
 
       } else {
-          // ถ้าเป็นโหมดปกติ (CLASSIC) -> ไปหน้าเลือกด่านเหมือนเดิม
           setScreen('THEME_SELECT');
       }
   };
@@ -469,7 +464,6 @@ export function App() {
         <TravelTransition 
             theme={selectedTheme} 
             onTransitionEnd={() => setScreen('GAME')}
-            // [แก้ไข] ส่ง Props เพื่อเปลี่ยนข้อความและโหลดวิดีโอ
             customText={gameType === 'RALLY' ? 'แข่งวิ่งมาราธอน' : undefined}
             preloadVideos={gameType === 'RALLY' ? RUNNER_VIDEOS : undefined}
         />
@@ -491,18 +485,23 @@ export function App() {
                 player={gamePlayers[0]}
                 theme={selectedTheme}
                 questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()}
+                onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} // [เพิ่ม] รับค่า Details
                 onGameEnd={(dist, score) => {
                     if (currentStudentId) {
+                        // [แก้ไข] ส่งข้อมูล Rally ไปบันทึก
+                        // @ts-ignore
                         StorageService.addSession(currentStudentId, { 
                             sessionId: Date.now().toString(), 
                             date: new Date().toISOString().split('T')[0], 
                             timestamp: new Date().toISOString(), 
                             score: score, 
-                            realScore: dist, 
+                            realScore: score, 
                             bonusScore: 0,
                             mode: gameMode, 
-                            details: sessionDetails,
+                            details: sessionDetails, // ส่ง Details ที่สะสมมา
+                            // @ts-ignore
                             gameType: 'RALLY', 
+                            // @ts-ignore
                             totalDistance: dist
                         });
                       }
@@ -524,6 +523,8 @@ export function App() {
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
                 onGameEnd={() => { 
                     if (currentStudentId) {
+                    // [แก้ไข] ส่งข้อมูล Classic ไปบันทึก
+                    // @ts-ignore
                     StorageService.addSession(currentStudentId, { 
                         sessionId: Date.now().toString(), 
                         date: new Date().toISOString().split('T')[0], 
@@ -531,7 +532,10 @@ export function App() {
                         score: gamePlayers[0].score, 
                         mode: gameMode, 
                         details: sessionDetails,
-                        gameType: 'CLASSIC'
+                        // @ts-ignore
+                        gameType: 'CLASSIC',
+                        // @ts-ignore
+                        totalDistance: 0
                     });
                     }
                     setScreen('RETURNING'); 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { PlayerState, MathQuestion, ThemeConfig } from '../types';
+import type { PlayerState, MathQuestion, ThemeConfig, QuestionDetail } from '../types'; 
 import { CharacterSvg } from './CharacterSvg';
 import { MathModal } from './MathModal';
-import { StorageService } from '../services/storage'; // เรียกใช้ Storage
+import { StorageService } from '../services/storage'; 
 import { Trophy, LogOut, Settings, Home, Dices, Footprints, Zap, PlayCircle, Star, Music, SkipForward, Play, Pause } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -12,6 +12,7 @@ interface Props {
   questions: MathQuestion[];
   onGameEnd: (finalDistance: number, score: number) => void;
   onExit: () => void;
+  onQuestionAnswered: (detail: QuestionDetail) => void; 
 }
 
 const SFX = {
@@ -29,6 +30,7 @@ const VIDEO_SOURCES = {
   FINISHED: '/runner-vids/finish.mp4'
 };
 
+// [ย้ายมาไว้ตรงนี้] เพื่อให้ VideoLayer มองเห็น
 type RunnerState = keyof typeof VIDEO_SOURCES;
 
 // --- Video Component ---
@@ -78,7 +80,7 @@ const VideoLayer = ({
 
 export const SmartBoard: React.FC<Props> = ({ 
   player, theme, questions,
-  onGameEnd, onExit 
+  onGameEnd, onExit, onQuestionAnswered 
 }) => {
   
   // --- STATE ---
@@ -99,27 +101,23 @@ export const SmartBoard: React.FC<Props> = ({
   
   // --- Audio State ---
   const [bgmVolume, setBgmVolume] = useState(0.5);
-  const [sfxVolume] = useState(0.5); // [แก้ไข] ลบ setSfxVolume ออกเพื่อแก้ Warning
+  const [sfxVolume] = useState(0.5); 
   
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false); 
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   
-  // Audio Refs
   const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const processingRef = useRef(false);
 
-  // --- AUDIO SYSTEM (ดึงจาก Settings ของครู) ---
-  
-  // ดึง Config
+  // Audio System
   // @ts-ignore
   const config = StorageService.getGameConfig ? StorageService.getGameConfig() : null;
-  const globalPlaylist = config?.bgmPlaylist || [];
+  const globalPlaylist = config?.bgmPlaylist || []; 
 
-  // เลือก Playlist
   const activePlaylist: string[] = theme.bgmUrls.length > 0 
       ? theme.bgmUrls 
       : (globalPlaylist.length > 0 ? globalPlaylist : ['https://assets.mixkit.co/active_storage/sfx/1234/sample-bgm.mp3']);
@@ -130,7 +128,6 @@ export const SmartBoard: React.FC<Props> = ({
       return link; 
   };
 
-  // Init Audio
   useEffect(() => {
     if (!audioRef.current) audioRef.current = new Audio();
     audioRef.current.volume = bgmVolume;
@@ -144,12 +141,10 @@ export const SmartBoard: React.FC<Props> = ({
     };
   }, []);
 
-  // Update Volume
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = bgmVolume;
   }, [bgmVolume]);
 
-  // Handle Song Playing
   useEffect(() => {
     if (audioRef.current && activePlaylist.length > 0) {
         const rawLink = activePlaylist[currentSongIndex];
@@ -167,9 +162,7 @@ export const SmartBoard: React.FC<Props> = ({
                     playPromise
                         .then(() => setAudioError(false))
                         .catch(error => {
-                            if (error.name !== 'AbortError') {
-                                setAudioError(true);
-                            }
+                            if (error.name !== 'AbortError') setAudioError(true);
                         });
                 }
             }
@@ -213,7 +206,6 @@ export const SmartBoard: React.FC<Props> = ({
       setCurrentQuestionIdx(0);
       processingRef.current = false;
       
-      // สุ่มเพลงและเล่นทันทีเมื่อกดปุ่มเริ่ม
       if (activePlaylist.length > 0) {
           const randomIndex = Math.floor(Math.random() * activePlaylist.length);
           setCurrentSongIndex(randomIndex);
@@ -233,6 +225,15 @@ export const SmartBoard: React.FC<Props> = ({
   };
 
   const handleAnswer = (correct: boolean) => {
+      // ส่งรายละเอียดกลับไปที่ App
+      if (activeQuestion) {
+          onQuestionAnswered({
+              questionText: activeQuestion.question,
+              isCorrect: correct,
+              scoreEarned: correct ? 10 : 0
+          });
+      }
+
       setActiveQuestion(null);
       setVisualEnergy(prev => Math.max(0, prev - 1));
 
@@ -250,7 +251,6 @@ export const SmartBoard: React.FC<Props> = ({
 
   const handleManualRoll = () => {
       if (gameState !== 'ROLL') return;
-      
       playSfx(SFX.CLICK);
       setIsSpinning(true);
       spinIntervalRef.current = setInterval(() => {
@@ -400,8 +400,7 @@ export const SmartBoard: React.FC<Props> = ({
   return (
     <div className="fixed inset-0 w-full h-full overflow-hidden font-['Mali'] bg-black flex flex-col md:flex-row">
       
-      {/* Audio Error Button */}
-      {audioError && hasInteracted && (
+      {audioError && hasInteracted && activePlaylist.length > 0 && (
           <div className="absolute top-20 right-4 z-[9999] animate-bounce">
               <button 
                   onClick={forcePlayAudio} 
@@ -412,10 +411,8 @@ export const SmartBoard: React.FC<Props> = ({
           </div>
       )}
 
-      {/* --- Global Music & Settings (Top Right - Vertical Stack) --- */}
+      {/* Music & Settings UI */}
       <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-50">
-          
-          {/* Music Control */}
           <div className="relative">
               <button 
                   onClick={() => setShowMusicMenu(!showMusicMenu)} 
@@ -435,7 +432,6 @@ export const SmartBoard: React.FC<Props> = ({
                           </button>
                       </div>
                       <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
-                          {/* [แก้ไข] ระบุ Type ให้ parameter */}
                           {activePlaylist.map((_: string, idx: number) => (
                               <button 
                                   key={idx} 
@@ -451,7 +447,6 @@ export const SmartBoard: React.FC<Props> = ({
               )}
           </div>
 
-          {/* Settings Control */}
           <div className="relative">
               <button 
                   onClick={() => setShowSettings(!showSettings)} 
@@ -482,7 +477,7 @@ export const SmartBoard: React.FC<Props> = ({
           </div>
       </div>
 
-      {/* --- READY OVERLAY --- */}
+      {/* Overlays and Modals */}
       {!hasInteracted && (
         <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in px-4">
             <div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg w-full">
@@ -495,16 +490,12 @@ export const SmartBoard: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ======================= MOBILE LAYOUT (20/55/25) ======================= */}
+      {/* Main Layouts */}
       <div className="md:hidden flex flex-col w-full h-full bg-slate-900">
-          
-          {/* Top 20% */}
           <div className="h-[20%] w-full relative z-30">
               <TopProfileSection mobileMode={true} />
               <button onClick={onExit} className="absolute top-2 left-2 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
           </div>
-
-          {/* Middle 55% (Video) */}
           <div className="h-[55%] w-full relative z-10 bg-black">
               <VideoLayer stateKey="IDLE" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <VideoLayer stateKey="RUN" activeState={runnerState} />
@@ -512,18 +503,13 @@ export const SmartBoard: React.FC<Props> = ({
               <VideoLayer stateKey="FALL" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <VideoLayer stateKey="FINISHED" activeState={runnerState} onVideoEnd={handleVideoFinish} />
           </div>
-
-          {/* Bottom 25% (Energy & Action Side-by-Side) */}
           <div className="h-[25%] w-full bg-slate-900 border-t-4 border-slate-700 flex relative z-30">
               <div className="w-1/2 border-r border-slate-700"><MiddleEnergySection /></div>
               <div className="w-1/2"><BottomActionSection /></div>
           </div>
       </div>
 
-      {/* ======================= DESKTOP LAYOUT (Original) ======================= */}
       <div className="hidden md:flex w-full h-full relative">
-          
-          {/* Video Area (75%) */}
           <div className="relative w-[75%] h-full bg-black overflow-hidden">
               <VideoLayer stateKey="IDLE" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <VideoLayer stateKey="RUN" activeState={runnerState} />
@@ -532,8 +518,6 @@ export const SmartBoard: React.FC<Props> = ({
               <VideoLayer stateKey="FINISHED" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <button onClick={onExit} className="absolute top-4 left-4 z-50 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={24} /></button>
           </div>
-
-          {/* Sidebar (25%) */}
           <div className="w-[25%] h-full bg-slate-900 border-l-4 border-slate-700 flex flex-col shadow-2xl relative z-20">
               <div className="flex-[0.25] border-b-4 border-slate-700"><TopProfileSection /></div>
               <div className="flex-[0.4] border-b-4 border-slate-700"><MiddleEnergySection /></div>
@@ -541,7 +525,6 @@ export const SmartBoard: React.FC<Props> = ({
           </div>
       </div>
 
-      {/* --- Modals --- */}
       {gameState === 'QUIZ' && activeQuestion && (
           <MathModal 
             question={activeQuestion} 
@@ -553,7 +536,6 @@ export const SmartBoard: React.FC<Props> = ({
           />
       )}
 
-      {/* สรุปผล */}
       {gameState === 'FINISHED' && (
          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[2000] animate-fade-in px-4">
              <div className="text-center p-8 bg-slate-900/90 rounded-3xl border-4 border-yellow-500 shadow-2xl backdrop-blur-md max-w-sm w-full relative transform scale-110">
