@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { PlayerState, MathQuestion, ThemeConfig } from '../types';
 import { CharacterSvg } from './CharacterSvg';
 import { MathModal } from './MathModal';
-import { Trophy, LogOut, Settings, Home, Dices, Footprints, Zap, PlayCircle, Star } from 'lucide-react';
+import { StorageService } from '../services/storage'; // เรียกใช้ Storage
+import { Trophy, LogOut, Settings, Home, Dices, Footprints, Zap, PlayCircle, Star, Music, SkipForward, Play, Pause } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -95,13 +96,112 @@ export const SmartBoard: React.FC<Props> = ({
   const spinIntervalRef = useRef<any>(null);
   const distanceIntervalRef = useRef<any>(null);
   const [activeQuestion, setActiveQuestion] = useState<MathQuestion | null>(null);
+  
+  // --- Audio State ---
   const [bgmVolume, setBgmVolume] = useState(0.5);
-  const [sfxVolume, setSfxVolume] = useState(0.5);
+  const [sfxVolume] = useState(0.5); // [แก้ไข] ลบ setSfxVolume ออกเพื่อแก้ Warning
+  
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
-
-  // Lock กันการรันซ้ำ
+  
+  // Audio Refs
+  const [audioError, setAudioError] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const processingRef = useRef(false);
+
+  // --- AUDIO SYSTEM (ดึงจาก Settings ของครู) ---
+  
+  // ดึง Config
+  // @ts-ignore
+  const config = StorageService.getGameConfig ? StorageService.getGameConfig() : null;
+  const globalPlaylist = config?.bgmPlaylist || [];
+
+  // เลือก Playlist
+  const activePlaylist: string[] = theme.bgmUrls.length > 0 
+      ? theme.bgmUrls 
+      : (globalPlaylist.length > 0 ? globalPlaylist : ['https://assets.mixkit.co/active_storage/sfx/1234/sample-bgm.mp3']);
+
+  const getDirectAudioLink = (link: string) => { 
+      if (!link) return ''; 
+      if (link.includes('dropbox.com')) return link.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', ''); 
+      return link; 
+  };
+
+  // Init Audio
+  useEffect(() => {
+    if (!audioRef.current) audioRef.current = new Audio();
+    audioRef.current.volume = bgmVolume;
+    
+    const handleEnded = () => handleNextSong();
+    audioRef.current.addEventListener('ended', handleEnded);
+    
+    return () => {
+      audioRef.current?.removeEventListener('ended', handleEnded);
+      audioRef.current?.pause();
+    };
+  }, []);
+
+  // Update Volume
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = bgmVolume;
+  }, [bgmVolume]);
+
+  // Handle Song Playing
+  useEffect(() => {
+    if (audioRef.current && activePlaylist.length > 0) {
+        const rawLink = activePlaylist[currentSongIndex];
+        if (!rawLink) return;
+
+        const directLink = getDirectAudioLink(rawLink);
+        
+        if (audioRef.current.src !== directLink) {
+            audioRef.current.src = directLink;
+            audioRef.current.load();
+            
+            if (isPlaying) {
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => setAudioError(false))
+                        .catch(error => {
+                            if (error.name !== 'AbortError') {
+                                setAudioError(true);
+                            }
+                        });
+                }
+            }
+        } else {
+            if (isPlaying && audioRef.current.paused) {
+                audioRef.current.play().catch(() => {});
+            } else if (!isPlaying && !audioRef.current.paused) {
+                audioRef.current.pause();
+            }
+        }
+    }
+  }, [currentSongIndex, activePlaylist, isPlaying]);
+
+  const togglePlay = () => setIsPlaying(!isPlaying);
+  
+  const handleNextSong = () => {
+      setCurrentSongIndex((prev) => (prev + 1) % activePlaylist.length);
+      setIsPlaying(true);
+  };
+  
+  const handleSelectSong = (idx: number) => { 
+      setCurrentSongIndex(idx); 
+      setIsPlaying(true); 
+      setShowMusicMenu(false);
+      setAudioError(false);
+  };
+  
+  const forcePlayAudio = () => {
+      setAudioError(false);
+      setIsPlaying(true);
+      if (audioRef.current) audioRef.current.play().catch(() => {});
+  };
 
   // --- GAME LOGIC ---
 
@@ -112,6 +212,18 @@ export const SmartBoard: React.FC<Props> = ({
       setVisualEnergy(10); 
       setCurrentQuestionIdx(0);
       processingRef.current = false;
+      
+      // สุ่มเพลงและเล่นทันทีเมื่อกดปุ่มเริ่ม
+      if (activePlaylist.length > 0) {
+          const randomIndex = Math.floor(Math.random() * activePlaylist.length);
+          setCurrentSongIndex(randomIndex);
+          setIsPlaying(true);
+          
+          if (audioRef.current) {
+              audioRef.current.src = getDirectAudioLink(activePlaylist[randomIndex]);
+              audioRef.current.play().catch(e => console.error("Start play error:", e));
+          }
+      }
   };
 
   const showQuestion = () => {
@@ -122,18 +234,17 @@ export const SmartBoard: React.FC<Props> = ({
 
   const handleAnswer = (correct: boolean) => {
       setActiveQuestion(null);
-      // ลดพลังงานลง 1
       setVisualEnergy(prev => Math.max(0, prev - 1));
 
       if (correct) {
           playSfx(SFX.SPRINT);
           setCurrentScore(prev => prev + 10);
-          setGameState('ROLL'); // ไปหน้าทอยเต๋า -> รอ user กด -> startSprint
+          setGameState('ROLL'); 
           setRunnerState('RUN'); 
       } else {
           playSfx(SFX.FALL);
           setGameState('MOVING'); 
-          setRunnerState('FALL'); // เล่นวิดีโอล้มเลย
+          setRunnerState('FALL'); 
       }
   };
 
@@ -164,35 +275,25 @@ export const SmartBoard: React.FC<Props> = ({
       animateDistanceVisual(targetDistance);
   };
 
-  // --- Core Loop Logic ---
   const handleVideoFinish = () => {
-      // **ป้องกันการรันซ้ำ (Double Firing Prevention)**
       if (processingRef.current) return;
       processingRef.current = true;
-      // ปลดล็อกหลังจากผ่านไปเล็กน้อย
       setTimeout(() => { processingRef.current = false; }, 500);
 
       if (runnerState === 'IDLE') {
-          // จบ Intro -> เริ่มข้อแรก
           setRunnerState('RUN');
           setTimeout(showQuestion, 1000);
       }
       else if (runnerState === 'SPRINT' || runnerState === 'FALL') {
-          // จบ Action (วิ่ง/ล้ม)
-          // เช็คว่าตอนนี้ทำข้อที่เท่าไหร่ (0-9)
           if (currentQuestionIdx < 9) {
-              // ยังไม่ครบ 10 ข้อ (ข้อ 9 คือข้อที่ 10) -> ไปข้อต่อไป
               setCurrentQuestionIdx(prev => prev + 1);
               setRunnerState('RUN'); 
               setTimeout(showQuestion, 1000);
           } else {
-              // ครบ 10 ข้อแล้ว -> เล่นฉากจบ
-              // จังหวะนี้ visualEnergy ควรเป็น 0 แล้ว
               setRunnerState('FINISHED');
           }
       }
       else if (runnerState === 'FINISHED') {
-          // จบฉากเข้าเส้นชัย -> สรุปคะแนน
           finishGame();
       }
   };
@@ -243,16 +344,6 @@ export const SmartBoard: React.FC<Props> = ({
                   <span className="text-sm text-yellow-100 font-bold">{currentScore} คะแนน</span>
               </div>
           </div>
-          
-          <div className="absolute top-2 right-2 md:top-2 md:right-2">
-              <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-700 p-2 rounded-full text-white hover:bg-slate-600 transition"><Settings size={16} /></button>
-          </div>
-          {showSettings && (
-              <div className="absolute top-10 right-2 bg-slate-900/95 p-4 rounded-xl border border-slate-600 w-40 text-white z-50 shadow-xl">
-                  <div className="text-xs mb-2">BGM <input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={e=>setBgmVolume(parseFloat(e.target.value))} className="w-full"/></div>
-                  <div className="text-xs">SFX <input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={e=>setSfxVolume(parseFloat(e.target.value))} className="w-full"/></div>
-              </div>
-          )}
       </div>
   );
 
@@ -309,6 +400,88 @@ export const SmartBoard: React.FC<Props> = ({
   return (
     <div className="fixed inset-0 w-full h-full overflow-hidden font-['Mali'] bg-black flex flex-col md:flex-row">
       
+      {/* Audio Error Button */}
+      {audioError && hasInteracted && (
+          <div className="absolute top-20 right-4 z-[9999] animate-bounce">
+              <button 
+                  onClick={forcePlayAudio} 
+                  className="bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 border-2 border-white hover:bg-red-500 transition-colors"
+              >
+                  <Music className="animate-pulse" size={20}/> กดเพื่อเล่นเพลง
+              </button>
+          </div>
+      )}
+
+      {/* --- Global Music & Settings (Top Right - Vertical Stack) --- */}
+      <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-50">
+          
+          {/* Music Control */}
+          <div className="relative">
+              <button 
+                  onClick={() => setShowMusicMenu(!showMusicMenu)} 
+                  className="bg-slate-900/80 p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700 backdrop-blur-sm transition-transform active:scale-95"
+              >
+                  <Music size={24} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} />
+              </button>
+              
+              {showMusicMenu && (
+                  <div className="absolute top-0 right-14 bg-slate-900/95 p-4 rounded-xl border border-slate-600 shadow-2xl w-64 backdrop-blur-md z-[3000] animate-fade-in">
+                      <div className="flex gap-2 mb-3">
+                          <button onClick={togglePlay} className="flex-1 bg-slate-700 py-2 rounded-lg flex justify-center hover:bg-slate-600 transition-colors">
+                              {isPlaying ? <Pause size={20}/> : <Play size={20}/>}
+                          </button>
+                          <button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded-lg flex justify-center hover:bg-slate-600 transition-colors">
+                              <SkipForward size={20}/>
+                          </button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
+                          {/* [แก้ไข] ระบุ Type ให้ parameter */}
+                          {activePlaylist.map((_: string, idx: number) => (
+                              <button 
+                                  key={idx} 
+                                  onClick={() => handleSelectSong(idx)} 
+                                  className={`w-full text-left text-xs p-2 rounded-lg truncate transition-colors flex items-center gap-2 ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400 font-bold' : 'text-slate-400 hover:bg-white/5'}`}
+                              >
+                                  <span>{currentSongIndex === idx ? '▶' : '🎵'}</span>
+                                  <span>Track {idx + 1}</span>
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+              )}
+          </div>
+
+          {/* Settings Control */}
+          <div className="relative">
+              <button 
+                  onClick={() => setShowSettings(!showSettings)} 
+                  className="bg-slate-900/80 p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700 backdrop-blur-sm transition-transform active:scale-95"
+              >
+                  <Settings size={24} />
+              </button>
+              
+              {showSettings && (
+                  <div className="absolute top-0 right-14 bg-slate-900/95 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000] animate-fade-in">
+                      <div className="text-xs font-bold text-slate-400 uppercase mb-2">Audio Settings</div>
+                      <div className="mb-2 text-xs space-y-3">
+                          <div className="flex items-center gap-2">
+                              <span className="w-8">BGM</span>
+                              <input 
+                                  type="range" 
+                                  min="0" 
+                                  max="1" 
+                                  step="0.1" 
+                                  value={bgmVolume} 
+                                  onChange={(e) => setBgmVolume(parseFloat(e.target.value))} 
+                                  className="flex-1 h-2 bg-slate-700 rounded-lg cursor-pointer accent-indigo-500" 
+                              />
+                          </div>
+                      </div>
+                  </div>
+              )}
+          </div>
+      </div>
+
       {/* --- READY OVERLAY --- */}
       {!hasInteracted && (
         <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in px-4">
