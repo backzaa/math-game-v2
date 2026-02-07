@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { GameBoard } from './components/GameBoard';
-import { SmartBoard } from './components/SmartBoard'; // นำเข้าบอร์ดใหม่
+import { SmartBoard } from './components/SmartBoard'; 
 import { StorageService } from './services/storage'; 
 import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail, GameType } from './types'; 
 import { 
@@ -23,6 +23,14 @@ const THEMES: ThemeConfig[] = [
   { id: 'candy', name: 'เมืองขนมหวาน', bgClass: 'candy', primaryColor: 'pink', secondaryColor: 'purple', decorations: [], bgmUrls: [] },
   { id: 'castle', name: 'ปราสาทพาสเทล', bgClass: 'castle', primaryColor: 'gray', secondaryColor: 'gold', decorations: [], bgmUrls: [] },
   { id: 'random', name: 'สุ่มดินแดน', bgClass: 'random', primaryColor: 'indigo', secondaryColor: 'rose', decorations: [], bgmUrls: [] },
+];
+
+const RUNNER_VIDEOS = [
+  '/runner-vids/idle.mp4',
+  '/runner-vids/run.mp4',
+  '/runner-vids/sprint.mp4',
+  '/runner-vids/fall.mp4',
+  '/runner-vids/finish.mp4'
 ];
 
 const HOME_THEME: ThemeConfig = { 
@@ -273,6 +281,47 @@ export function App() {
   const handleSelectSong = (index: number) => { setCurrentSongIndex(index); setIsPlaying(true); setShowMusicMenu(false); setAudioError(false); };
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
+  // --- [เพิ่ม] ฟังก์ชัน selectMode ที่คุณแจ้งว่าหาไม่เจอ เพื่อจัดการ Logic การเข้าเกม ---
+  const selectMode = (mode: ScoringMode) => {
+      setGameMode(mode);
+      
+      // ถ้าเลือกแข่งระยะทาง (RALLY) -> ให้เริ่มเกมเลย (ข้ามหน้าเลือกด่าน)
+      if (gameType === 'RALLY') {
+          // ใช้ Theme Default เพื่อไม่ให้ Error (แต่ชื่อจะถูก Override ใน TravelTransition)
+          const defaultTheme = THEMES.find(t => t.id === 'jungle') || THEMES[0];
+          
+          localStorage.removeItem('math_game_session_players');
+          localStorage.removeItem('math_game_session_index');
+
+          setSelectedTheme(defaultTheme);
+          setScreen('TRAVELING'); // ไปหน้าโหลดทันที
+
+          // เตรียมข้อมูลผู้เล่น
+          const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
+          setGamePlayers([{
+              ...(s || {
+                  id:'00', 
+                  firstName:guestName, 
+                  lastName: '', 
+                  nickname:guestName, 
+                  gender:'MALE', 
+                  classroom:'ทั่วไป', 
+                  profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
+                  appearance:{base:'BOY', skinColor:'#fcd34d'}, 
+                  sessions:[]
+              }), 
+              position:0, score:0, character:'BOY', 
+              calculatorUsesLeft: mode === 'FREEPLAY' ? 2 : 0, 
+              isFinished:false
+          }]); 
+          setSessionDetails([]);
+
+      } else {
+          // ถ้าเป็นโหมดปกติ (CLASSIC) -> ไปหน้าเลือกด่านเหมือนเดิม
+          setScreen('THEME_SELECT');
+      }
+  };
+
   const renderContent = () => {
     const transitionScreens = ['LOGIN', 'GAME_TYPE_SELECT', 'MODE_SELECT', 'THEME_SELECT'];
     if (transitionScreens.includes(screen)) {
@@ -316,7 +365,7 @@ export function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full px-4">
                 <button 
                   disabled={hasPlayedClassroomToday()}
-                  onClick={() => { setGameMode('CLASSROOM'); setScreen('THEME_SELECT'); }} 
+                  onClick={() => selectMode('CLASSROOM')} 
                   className={`group relative p-8 md:p-12 rounded-[40px] border-4 transition-all shadow-2xl overflow-hidden ${hasPlayedClassroomToday() ? 'bg-slate-800/50 border-slate-700 opacity-60 grayscale cursor-not-allowed' : 'bg-slate-800 border-orange-500/30 hover:border-orange-400 hover:scale-105 active:scale-95'}`}
                 >
                    {hasPlayedClassroomToday() ? <Lock className="text-slate-500 mb-6 mx-auto" size={80}/> : <Star className="text-orange-400 mb-4 md:mb-6 mx-auto group-hover:rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" fill="currentColor" />}
@@ -324,7 +373,10 @@ export function App() {
                    <p className="text-slate-400 text-sm md:text-lg text-center">{hasPlayedClassroomToday() ? 'วันนี้คุณเล่นเก็บคะแนนครบแล้วครับ 😊' : 'เก็บคะแนนจริงจัง (10 ข้อ)'}</p>
                 </button>
     
-                <button onClick={() => { setGameMode('FREEPLAY'); setScreen('THEME_SELECT'); }} className="group relative bg-slate-800 p-8 md:p-12 rounded-[40px] border-4 border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105 shadow-2xl overflow-hidden active:scale-95">
+                <button 
+                    onClick={() => selectMode('FREEPLAY')} 
+                    className="group relative bg-slate-800 p-8 md:p-12 rounded-[40px] border-4 border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-105 shadow-2xl overflow-hidden active:scale-95"
+                >
                    <Gamepad2 className="text-cyan-400 mb-4 md:mb-6 mx-auto group-hover:-rotate-12 transition-all w-16 h-16 md:w-20 md:h-20" size={80} />
                    <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center">เล่นตามใจ</h2>
                    <p className="text-slate-400 text-sm md:text-lg text-center">ฝึกฝนฝีมือ (ไม่จำกัด)</p>
@@ -413,7 +465,15 @@ export function App() {
     }
 
     if (screen === 'TRAVELING' && selectedTheme) {
-      return <TravelTransition theme={selectedTheme} onTransitionEnd={() => setScreen('GAME')} />;
+      return (
+        <TravelTransition 
+            theme={selectedTheme} 
+            onTransitionEnd={() => setScreen('GAME')}
+            // [แก้ไข] ส่ง Props เพื่อเปลี่ยนข้อความและโหลดวิดีโอ
+            customText={gameType === 'RALLY' ? 'แข่งวิ่งมาราธอน' : undefined}
+            preloadVideos={gameType === 'RALLY' ? RUNNER_VIDEOS : undefined}
+        />
+      );
     }
 
     if (screen === 'RETURNING') {
