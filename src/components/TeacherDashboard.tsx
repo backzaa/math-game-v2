@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode, GameGlobalConfig } from '../types';
-import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock } from 'lucide-react';
+import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock, Flag, Map } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
@@ -294,13 +294,13 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto overflow-x-auto md:overflow-visible pb-2 md:pb-0 custom-scrollbar">
-             <button onClick={() => setActiveTab('REPORTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ผลการเรียน</button>
-             <button onClick={() => setActiveTab('QUESTIONS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>จัดการโจทย์</button>
-             <button onClick={() => setActiveTab('ASSETS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ตั้งค่าเกม</button>
-             <button onClick={() => setActiveTab('STUDENTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>รายชื่อนักเรียน</button>
-             <button onClick={onLogout} className="hidden md:flex text-red-400 hover:text-white items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 whitespace-nowrap ml-auto">
-                <LogOut size={18}/> ออก
-             </button>
+              <button onClick={() => setActiveTab('REPORTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ผลการเรียน</button>
+              <button onClick={() => setActiveTab('QUESTIONS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>จัดการโจทย์</button>
+              <button onClick={() => setActiveTab('ASSETS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ตั้งค่าเกม</button>
+              <button onClick={() => setActiveTab('STUDENTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>รายชื่อนักเรียน</button>
+              <button onClick={onLogout} className="hidden md:flex text-red-400 hover:text-white items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 whitespace-nowrap ml-auto">
+                 <LogOut size={18}/> ออก
+              </button>
           </div>
        </header>
 
@@ -336,7 +336,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                <div className="grid grid-cols-4 gap-2">
                                    {['add', 'sub', 'mul', 'div'].map(op => (
                                        <button key={op} onClick={() => setRandomConfig({...randomConfig, operators:{...randomConfig.operators, [op as keyof typeof randomConfig.operators]: !randomConfig.operators[op as keyof typeof randomConfig.operators]}})} className={`py-2 rounded-lg font-bold border-2 transition-all ${randomConfig.operators[op as keyof typeof randomConfig.operators] ? 'bg-blue-600 border-blue-400 text-white shadow-inner' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
-                                           {op === 'add' ? '+' : op === 'sub' ? '-' : op === 'mul' ? '×' : '÷'}
+                                            {op === 'add' ? '+' : op === 'sub' ? '-' : op === 'mul' ? '×' : '÷'}
                                        </button>
                                    ))}
                                </div>
@@ -351,8 +351,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            <div className="grid grid-cols-2 gap-3 mb-4">
                                {newCustomQ.opts.map((opt, idx) => (
                                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition ${newCustomQ.correctIdx === idx ? 'border-green-500 bg-green-500/10' : 'border-slate-600'}`}>
-                                       <input type="radio" name="correctQ" checked={newCustomQ.correctIdx === idx} onChange={() => setNewCustomQ({...newCustomQ, correctIdx: idx})} className="w-4 h-4 accent-green-500 cursor-pointer"/>
-                                       <input placeholder={`ตัวเลือกที่ ${idx+1}`} value={opt} onChange={e => { const n = [...newCustomQ.opts]; n[idx] = e.target.value; setNewCustomQ({...newCustomQ, opts: n}); }} className="bg-transparent w-full outline-none text-sm"/>
+                                        <input type="radio" name="correctQ" checked={newCustomQ.correctIdx === idx} onChange={() => setNewCustomQ({...newCustomQ, correctIdx: idx})} className="w-4 h-4 accent-green-500 cursor-pointer"/>
+                                        <input placeholder={`ตัวเลือกที่ ${idx+1}`} value={opt} onChange={e => { const n = [...newCustomQ.opts]; n[idx] = e.target.value; setNewCustomQ({...newCustomQ, opts: n}); }} className="bg-transparent w-full outline-none text-sm"/>
                                    </div>
                                ))}
                            </div>
@@ -371,11 +371,11 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            ) : (
                                generatedQuestions.map((q, i) => (
                                    <div key={q.id || i} className="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700 group hover:border-blue-500/50 transition">
-                                       <div><span className="text-slate-500 font-mono mr-3">#{i+1}</span><span className="text-lg font-bold">{q.question}</span></div>
-                                       <div className="flex items-center gap-4">
-                                           <span className="text-green-400 font-black text-xl">= {q.answer}</span>
-                                           <button onClick={() => setGeneratedQuestions(generatedQuestions.filter((_, idx) => idx !== i))} className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={18}/></button>
-                                       </div>
+                                        <div><span className="text-slate-500 font-mono mr-3">#{i+1}</span><span className="text-lg font-bold">{q.question}</span></div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-green-400 font-black text-xl">= {q.answer}</span>
+                                            <button onClick={() => setGeneratedQuestions(generatedQuestions.filter((_, idx) => idx !== i))} className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={18}/></button>
+                                        </div>
                                    </div>
                                ))
                            )}
@@ -401,19 +401,19 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
                                return (
                                    <div key={theme.id} className="bg-slate-900/50 p-4 rounded-xl border border-slate-600 hover:border-blue-500/50 transition">
-                                       <label className="block text-sm font-bold text-blue-300 mb-2">{theme.label}</label>
-                                       <div className="flex gap-3">
-                                           <input type="text" placeholder="URL รูปภาพ/วิดีโอ (รองรับ Google Drive)" value={bgUrl || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
-                                           {bgUrl && (
-                                               <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg">
-                                                    {isVideo ? (
-                                                        <video src={getDirectImageLink(bgUrl)} className="w-full h-full object-cover" autoPlay loop muted playsInline />
-                                                    ) : (
-                                                        <img src={getDirectImageLink(bgUrl)} alt="preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                    )}
-                                               </div>
-                                           )}
-                                       </div>
+                                        <label className="block text-sm font-bold text-blue-300 mb-2">{theme.label}</label>
+                                        <div className="flex gap-3">
+                                            <input type="text" placeholder="URL รูปภาพ/วิดีโอ (รองรับ Google Drive)" value={bgUrl || ''} onChange={e => setGameConfig({...gameConfig, themeBackgrounds:{...gameConfig.themeBackgrounds, [theme.id]: e.target.value}})} className="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-500 text-white text-sm outline-none focus:border-blue-400 transition-all"/>
+                                            {bgUrl && (
+                                                <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-500 shrink-0 bg-black shadow-lg">
+                                                     {isVideo ? (
+                                                         <video src={getDirectImageLink(bgUrl)} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+                                                     ) : (
+                                                         <img src={getDirectImageLink(bgUrl)} alt="preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                     )}
+                                                </div>
+                                            )}
+                                        </div>
                                    </div>
                                );
                            })}
@@ -526,33 +526,68 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                           selectedStudent.sessions.filter(s => s.mode === reportMode).slice().reverse().map((sess, idx) => (
                             <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden shadow-lg transition hover:border-blue-500/30">
                                <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700 cursor-pointer" onClick={() => toggleSessionDetails(sess.sessionId)}>
+                                  {/* ส่วนแสดงวันที่ เวลา และป้ายกำกับโหมด */}
                                   <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
                                      <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
                                      <span className="flex items-center gap-1.5"><Clock size={16}/> {new Date(sess.timestamp).toLocaleTimeString('th-TH')}</span>
+                                     
+                                     {/* ป้ายบอกโหมด */}
+                                     {/* @ts-ignore */}
+                                     <span className={`text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${(sess as any).gameType === 'RALLY' ? 'bg-orange-900/50 border-orange-500 text-orange-400' : 'bg-blue-900/50 border-blue-500 text-blue-400'}`}>
+                                        {/* @ts-ignore */}
+                                        {(sess as any).gameType === 'RALLY' ? <><Flag size={10}/> แข่งระยะทาง</> : <><Map size={10}/> ผจญภัย</>}
+                                     </span>
                                   </div>
+
                                   <div className="flex items-center gap-4">
                                      <div className="text-right flex flex-col items-end gap-1">
+                                        {/* ส่วนแสดงรายละเอียดคะแนน (แยกตามโหมด) */}
                                         <div className="flex flex-wrap justify-end gap-2 text-[10px] md:text-[11px] font-bold">
-                                           <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">คะแนนจริง {sess.realScore || 0}</span>
-                                           <span className="text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">คะแนนสมบัติ {sess.bonusScore || 0}</span>
+                                            {/* @ts-ignore */}
+                                            {(sess as any).gameType === 'RALLY' ? (
+                                                // === RALLY MODE ===
+                                                <>
+                                                   <span className="text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-full border border-orange-400/20 flex items-center gap-1">
+                                                       <Flag size={12}/> ระยะทาง {(sess as any).totalDistance || 0} ม.
+                                                   </span>
+                                                   <span className="text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full border border-yellow-400/20 flex items-center gap-1">
+                                                       <Star size={12}/> คะแนน {sess.realScore}
+                                                   </span>
+                                                </>
+                                            ) : (
+                                                // === CLASSIC MODE ===
+                                                <>
+                                                   <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">คะแนนจริง {sess.realScore || 0}</span>
+                                                   <span className="text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">คะแนนสมบัติ {sess.bonusScore || 0}</span>
+                                                </>
+                                            )}
                                         </div>
+                                        
+                                        {/* คะแนนรวมตัวใหญ่ */}
                                         <div className="flex flex-col items-end">
-                                           <div className="text-3xl font-black text-white drop-shadow-md leading-none">{sess.score}</div>
-                                           <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">ผลรวมครั้งนี้</div>
+                                            {/* @ts-ignore */}
+                                            <div className="text-3xl font-black text-white drop-shadow-md leading-none">{(sess as any).gameType === 'RALLY' ? sess.realScore : sess.score}</div>
+                                            <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">
+                                                {/* @ts-ignore */}
+                                                {(sess as any).gameType === 'RALLY' ? 'คะแนนที่ได้' : 'ผลรวมครั้งนี้'}
+                                            </div>
                                         </div>
                                      </div>
+
                                      <div className="p-2 rounded-full bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                          {expandedSessions.has(sess.sessionId) ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
                                      </div>
+                                     
                                      <button 
-                                        onClick={(e) => handleClickDeleteSession(selectedStudent.id, sess.sessionId, e)} 
-                                        className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"
+                                         onClick={(e) => handleClickDeleteSession(selectedStudent.id, sess.sessionId, e)} 
+                                         className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-all"
                                      >
                                          <Trash2 size={20}/>
                                      </button>
                                   </div>
                                </div>
                                
+                               {/* ส่วนรายละเอียด (Details) - คงเดิม */}
                                {expandedSessions.has(sess.sessionId) && (
                                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30 animate-pop-in">
                                       {sess.details?.map((d, dIdx) => (

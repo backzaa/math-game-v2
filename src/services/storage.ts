@@ -177,9 +177,9 @@ export const StorageService = {
 
   syncFromCloud: async () => {
       try {
-          const resp = await fetch(SCRIPT_URL);
-          const data = await resp.json();
-          if (data.students) {
+        const resp = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
+        const data = await resp.json();
+        if (data.students) {
               // @ts-ignore
               const students = data.students.map((s: any) => {
                   // @ts-ignore
