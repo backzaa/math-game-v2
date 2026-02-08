@@ -88,6 +88,21 @@ export const StorageService = {
           } catch (e) { console.error("Error deleting score:", e); }
       }
   },
+  // ... (ต่อจากปีกกาปิดของ deleteSession)
+
+  // [เพิ่มใหม่] ฟังก์ชันฝัง Lock ลงเครื่อง
+  markPlayedToday: (studentId: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem(`locked_classroom_${studentId}_${today}`, 'true');
+},
+
+// [เพิ่มใหม่] เช็คว่าเครื่องนี้มี Lock หรือไม่
+checkLocalPlayedToday: (studentId: string): boolean => {
+    const today = new Date().toISOString().split('T')[0];
+    return localStorage.getItem(`locked_classroom_${studentId}_${today}`) === 'true';
+},
+
+// ... (ก่อนถึง saveScore)
 
   saveScore: async (
     id: string, 
@@ -100,6 +115,10 @@ export const StorageService = {
     gameType: string = 'CLASSIC',
     totalDistance: number = 0
   ) => {
+    // [แทรกตรงนี้!] ถ้าเป็นโหมดห้องเรียน ให้ฝัง Lock ลงเครื่องทันที
+    if (mode === 'CLASSROOM') {
+        StorageService.markPlayedToday(id);
+    }
       if (id === '00') {
           try { 
               await fetch(SCRIPT_URL, { 

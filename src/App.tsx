@@ -133,6 +133,11 @@ export function App() {
 
   const hasPlayedClassroomToday = () => {
     if (!currentStudentId || currentStudentId === '00') return false; 
+    
+    // 1. เช็ค Lock ในเครื่องก่อน (กันรีเฟรชเครื่องเดิม)
+    if (StorageService.checkLocalPlayedToday(currentStudentId)) return true;
+
+    // 2. เช็คจากประวัติที่ดึงมาจาก Cloud (กันสลับเครื่องมาเล่น)
     const student = StorageService.getStudent(currentStudentId);
     if (!student || !student.sessions) return false;
     const today = new Date().toISOString().split('T')[0];
