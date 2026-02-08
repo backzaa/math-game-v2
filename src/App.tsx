@@ -4,7 +4,7 @@ import { TeacherDashboard } from './components/TeacherDashboard';
 import { GameBoard } from './components/GameBoard';
 import { SmartBoard } from './components/SmartBoard'; 
 import { StorageService } from './services/storage'; 
-import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail, GameType } from './types'; 
+import type { UserRole, ThemeConfig, PlayerState, ScoringMode, QuestionDetail, GameType, MathQuestion } from './types'; 
 import { 
   Star, Gamepad2, CloudSync, 
   Plus, Divide,
@@ -43,6 +43,16 @@ const HOME_THEME: ThemeConfig = {
   bgmUrls: []
 };
 
+// ฟังก์ชันสลับลำดับโจทย์ (Shuffle)
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 export function App() {
   const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'GAME_TYPE_SELECT' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'RETURNING' | 'GAME' | 'DASHBOARD'>('LOADING');
   
@@ -56,7 +66,10 @@ export function App() {
   const [selectedTheme, setSelectedTheme] = useState<ThemeConfig | null>(null);
   const [gamePlayers, setGamePlayers] = useState<PlayerState[]>([]);
   const [sessionDetails, setSessionDetails] = useState<QuestionDetail[]>([]);
-  
+  // ตัวแปรเก็บโจทย์ที่สุ่มมาแล้วสำหรับรอบนี้
+  const [activeGameQuestions, setActiveGameQuestions] = useState<MathQuestion[]>([]);
+
+
   const [themeBackgrounds, setThemeBackgrounds] = useState<Record<string, string>>({});
 
   const [loadProgress, setLoadProgress] = useState(0);
@@ -282,40 +295,65 @@ export function App() {
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
   const selectMode = (mode: ScoringMode) => {
-      setGameMode(mode);
-      
-      if (gameType === 'RALLY') {
-          const defaultTheme = THEMES.find(t => t.id === 'jungle') || THEMES[0];
-          
-          localStorage.removeItem('math_game_session_players');
-          localStorage.removeItem('math_game_session_index');
-
-          setSelectedTheme(defaultTheme);
-          setScreen('TRAVELING'); 
-
-          const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
-          setGamePlayers([{
-              ...(s || {
-                  id:'00', 
-                  firstName:guestName, 
-                  lastName: '', 
-                  nickname:guestName, 
-                  gender:'MALE', 
-                  classroom:'ทั่วไป', 
-                  profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
-                  appearance:{base:'BOY', skinColor:'#fcd34d'}, 
-                  sessions:[]
-              }), 
-              position:0, score:0, character:'BOY', 
-              calculatorUsesLeft: mode === 'FREEPLAY' ? 2 : 0, 
-              isFinished:false
-          }]); 
-          setSessionDetails([]); 
-
-      } else {
-          setScreen('THEME_SELECT');
+    setGameMode(mode);
+    
+    // [เริ่มส่วนแก้ไข] เตรียมโจทย์: สุ่มและล็อคชุดโจทย์ไว้เลย
+    let qList: MathQuestion[] = [];
+    
+    if (mode === 'CLASSROOM') {
+      // [แก้ไข 1] เติม as MathQuestion[] ต่อท้าย
+      const dailyQs = StorageService.getDailyQuestions() as MathQuestion[];
+      if (dailyQs && dailyQs.length > 0) {
+          qList = shuffleArray(dailyQs); 
       }
-  };
+  } else {
+      // [แก้ไข 2] เติม as MathQuestion[] ต่อท้ายเช่นกัน
+      const pool = StorageService.getFreeplayQuestions() as MathQuestion[];
+      if (pool && pool.length > 0) {
+          qList = shuffleArray(pool).slice(0, 10);
+      }
+  }
+    
+    // กันเหนียวถ้าไม่มีโจทย์เลย ให้ใส่โจทย์สำรอง 1 ข้อ
+    if (qList.length === 0) {
+        qList = [{id:'def', question:'1+1', answer:2, options:[1,2,3,4]}];
+    }
+    
+    setActiveGameQuestions(qList); // บันทึกใส่ตัวแปร State ที่เราสร้างในข้อ 1.2
+    // [จบส่วนแก้ไข]
+
+    if (gameType === 'RALLY') {
+        const defaultTheme = THEMES.find(t => t.id === 'jungle') || THEMES[0];
+        
+        localStorage.removeItem('math_game_session_players');
+        localStorage.removeItem('math_game_session_index');
+
+        setSelectedTheme(defaultTheme);
+        setScreen('TRAVELING'); 
+
+        const s = currentStudentId === '00' ? null : StorageService.getStudent(currentStudentId!); 
+        setGamePlayers([{
+            ...(s || {
+                id:'00', 
+                firstName:guestName, 
+                lastName: '', 
+                nickname:guestName, 
+                gender:'MALE', 
+                classroom:'ทั่วไป', 
+                profileImage: currentStudentId === '00' ? emojiToDataUrl(currentGuestAvatar) : undefined,
+                appearance:{base:'BOY', skinColor:'#fcd34d'}, 
+                sessions:[]
+            }), 
+            position:0, score:0, character:'BOY', 
+            calculatorUsesLeft: mode === 'FREEPLAY' ? 2 : 0, 
+            isFinished:false
+        }]); 
+        setSessionDetails([]); 
+
+    } else {
+        setScreen('THEME_SELECT');
+    }
+};
 
   const renderContent = () => {
     const transitionScreens = ['LOGIN', 'GAME_TYPE_SELECT', 'MODE_SELECT', 'THEME_SELECT'];
@@ -484,7 +522,7 @@ export function App() {
              <SmartBoard 
                 player={gamePlayers[0]}
                 theme={selectedTheme}
-                questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()}
+                questions={activeGameQuestions}
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} // [เพิ่ม] รับค่า Details
                 onGameEnd={(dist, score) => {
                     if (currentStudentId) {
@@ -518,7 +556,7 @@ export function App() {
                 currentPlayerIndex={0} 
                 theme={selectedTheme} 
                 gameMode={gameMode} 
-                questions={gameMode === 'CLASSROOM' ? StorageService.getDailyQuestions() : StorageService.getFreeplayQuestions()} 
+                questions={activeGameQuestions}
                 onTurnComplete={(p) => setGamePlayers(p)} 
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
                 onGameEnd={() => { 

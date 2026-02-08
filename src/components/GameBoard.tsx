@@ -41,7 +41,7 @@ const GAME_CONFIG = {
 };
 
 export const GameBoard: React.FC<Props> = ({ 
-  players, currentPlayerIndex, theme, gameMode,
+    players, currentPlayerIndex, theme, questions, // <--- เพิ่มตรงนี้
   onTurnComplete, onQuestionAnswered, onGameEnd, onExit 
 }) => {
   const currentThemeKey = (theme?.id || theme?.bgClass || 'default').toLowerCase().split(' ')[0];
@@ -82,8 +82,10 @@ export const GameBoard: React.FC<Props> = ({
   
   const [audioError, setAudioError] = useState(false);
   const [isVideoBg, setIsVideoBg] = useState(false);
+  // ตัวแปรนับว่าตอนนี้ถึงโจทย์ข้อที่เท่าไหร่แล้ว (เริ่มที่ 0)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
-  const [gameQuestions, setGameQuestions] = useState<MathQuestion[]>([]);
+  
   const [localPlayers, setLocalPlayers] = useState<PlayerState[]>(() => {
     const saved = localStorage.getItem('math_game_session_players');
     return saved ? JSON.parse(saved) : players;
@@ -132,21 +134,23 @@ export const GameBoard: React.FC<Props> = ({
   };
 
   useEffect(() => { 
-      if (gameMode === 'CLASSROOM') { 
-          const daily = StorageService.getDailyQuestions(); 
-          setGameQuestions((daily && daily.length > 0) ? daily : [{id:'def', question:'1+1', answer:2, options:[1,2,3,4]}]); 
-      } else { 
-          const pool = StorageService.getFreeplayQuestions(); 
-          if (pool.length > 0) { const shuffled = [...pool].sort(() => 0.5 - Math.random()); setGameQuestions(shuffled.slice(0, 10)); } 
-          else { setGameQuestions([{id:'free', question:'2+2', answer:4, options:[3,4,5,6]}]); } 
-      } 
-      const customConfig = StorageService.getGameConfig(); const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; let checkVideo = false; if (finalBg) { finalBg = getDirectImageLink(finalBg); if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } } setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); setIsVideoBg(checkVideo); 
-      
-      // [แก้ไข 1] สุ่มเพลงเมื่อเริ่มเกม
-      if (playlist.length > 0) { 
-        setCurrentSongIndex(Math.floor(Math.random() * playlist.length)); 
-      } 
-  }, [theme, currentThemeKey, defaultAssets, gameMode]);
+    // [แก้ไข] ลบส่วนโหลดโจทย์ออก เหลือแค่โหลด BG/Music
+    const customConfig = StorageService.getGameConfig(); 
+    const specificBg = customConfig?.themeBackgrounds?.[currentThemeKey]; 
+    const playlist = (customConfig?.bgmPlaylist && customConfig.bgmPlaylist.length > 0) ? customConfig.bgmPlaylist : []; 
+    let finalBg = specificBg && specificBg.trim() !== '' ? specificBg : null; 
+    let checkVideo = false; 
+    if (finalBg) { 
+        finalBg = getDirectImageLink(finalBg); 
+        if (finalBg.match(/\.(mp4|webm|ogg)$/i) || finalBg.includes('youtube.com') || finalBg.includes('youtu.be')) { checkVideo = true; } 
+    } 
+    setActiveAssets({ bg: finalBg, bgmPlaylist: playlist }); 
+    setIsVideoBg(checkVideo); 
+    
+    if (playlist.length > 0) { 
+      setCurrentSongIndex(Math.floor(Math.random() * playlist.length)); 
+    } 
+}, [theme, currentThemeKey, defaultAssets]);
   
   useEffect(() => { 
     if (hasInteracted && activeAssets.bgmPlaylist.length > 0 && audioRef.current) { 
@@ -277,7 +281,14 @@ export const GameBoard: React.FC<Props> = ({
   const moveOneStep = (stepsRemaining: number, currentPos: number) => { if (stepsRemaining <= 0) { setIsMoving(false); const tile = tiles[currentPos]; if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); else if (tile?.type === 'QUESTION' && pendingSteps === 0) handleTileEvent('QUESTION'); else endTurn(); return; } setIsMoving(true); playSfx(SFX.STEP); const nextPos = Math.min(currentPos + 1, tiles.length - 1); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; setLocalPlayers(newPlayers); onTurnComplete(newPlayers, localCurrentIndex); setTimeout(() => { const tile = tiles[nextPos]; if (tile?.type === 'FINISH') { setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; } if (tile?.type === 'QUESTION') { setIsMoving(false); setPendingSteps(stepsRemaining - 1); handleTileEvent('QUESTION'); return; } if (tile?.type === 'TRAP' && stepsRemaining === 1) { setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; } moveOneStep(stepsRemaining - 1, nextPos); }, 500); };
   
   const handleTileEvent = (type: TileType) => { 
-      if (type === 'QUESTION') setActiveQuestion(gameQuestions[Math.floor(Math.random() * gameQuestions.length)]); 
+    if (type === 'QUESTION') {
+        // [แก้ไขใหม่] หยิบโจทย์จากสำรับทีละใบ ตามลำดับตัวเลข
+        // (ใช้ % เพื่อให้วนกลับมาข้อแรกได้ ถ้าเดินตกช่องคำถามเกินจำนวนโจทย์ที่มี)
+        const q = questions[currentQuestionIndex % questions.length];
+        
+        setActiveQuestion(q);
+          setCurrentQuestionIndex(prev => prev + 1);
+    } 
       else if (type === 'TREASURE') { 
           playSfx(SFX.TREASURE); 
           const bonus = GAME_CONFIG.pointsPerTreasure; 
