@@ -101,6 +101,29 @@ export const StorageService = {
     gameType: string = 'CLASSIC',
     totalDistance: number = 0
   ) => {
+      // กรณีผู้มาเยือน (ID 00)
+      if (id === '00') {
+          try { 
+              await fetch(SCRIPT_URL, { 
+                  method: 'POST', mode: 'no-cors', 
+                  body: JSON.stringify({ 
+                      action: 'saveScore', 
+                      id: '00', 
+                      name: name || 'ผู้มาเยือน', 
+                      score, 
+                      realScore, 
+                      bonusScore, 
+                      mode, 
+                      details,
+                      gameType,
+                      totalDistance
+                  }) 
+              }); 
+          } catch (e) {}
+          return; 
+      }
+
+      // กรณีนักเรียนปกติ
       const students = StorageService.getAllStudents();
       const idx = students.findIndex(s => String(Number(s.id)) === String(Number(id)));
       
@@ -122,7 +145,6 @@ export const StorageService = {
           if (!students[idx].sessions) students[idx].sessions = [];
           students[idx].sessions.push(newSession);
           
-          // [แก้ Error 1] ใช้ (as any) เพื่อเข้าถึง property score
           const currentTotal = (students[idx] as any).score || 0;
           (students[idx] as any).score = currentTotal + realScore; 
 
@@ -134,7 +156,7 @@ export const StorageService = {
                   body: JSON.stringify({ 
                       action: 'saveScore', 
                       id, 
-                      name: name || students[idx].firstName, // [แก้ Error 2] ใช้ตัวแปร name ที่รับมาด้วย
+                      name: name || students[idx].firstName, 
                       score, 
                       realScore, 
                       bonusScore, 
@@ -148,11 +170,9 @@ export const StorageService = {
       }
   },
 
-  // Alias
-  addSession: async (id: string, sess: GameSession) => {
-      // คำนวณ realScore จาก details
+  // [UPDATED] เพิ่ม studentName ใน addSession
+  addSession: async (id: string, sess: GameSession, studentName: string = '') => {
       const realScore = sess.details ? sess.details.reduce((sum, d) => sum + (d.isCorrect ? d.scoreEarned : 0), 0) : 0;
-      // ถ้าเป็นโหมด RALLY (มี totalDistance) ให้ถือว่า bonus เป็น 0
       // @ts-ignore
       const isRally = sess.gameType === 'RALLY';
       const bonusScore = isRally ? 0 : (sess.score - realScore);
@@ -164,7 +184,7 @@ export const StorageService = {
 
       await StorageService.saveScore(
           id, 
-          '', 
+          studentName, 
           sess.score, 
           realScore, 
           bonusScore, 
@@ -180,19 +200,14 @@ export const StorageService = {
         const resp = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
         const data = await resp.json();
         if (data.students) {
-              // @ts-ignore
               const students = data.students.map((s: any) => {
-                  // @ts-ignore
                   const studentScores = data.scores ? data.scores.filter((sc: any) => String(sc.studentId) === String(s.id)) : [];
-                  
-                  // คำนวณคะแนนรวมใหม่ (รวม Real Score ทั้งหมด)
                   const totalRealScore = studentScores.reduce((sum: number, sc: any) => sum + (Number(sc.realScore) || 0), 0);
 
                   return {
                       ...s,
-                      score: totalRealScore, // อัปเดตคะแนนรวมที่นี่
+                      score: totalRealScore, 
                       profileImage: formatImageLink(s.profileImage || ''),
-                      // @ts-ignore
                       sessions: studentScores.map((sc: any) => ({
                           sessionId: sc.timestamp,
                           date: new Date(sc.timestamp).toLocaleDateString('th-TH'),

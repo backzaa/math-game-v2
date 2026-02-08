@@ -525,27 +525,30 @@ export function App() {
                 questions={activeGameQuestions}
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} // [เพิ่ม] รับค่า Details
                 onGameEnd={(dist, score) => {
-                    if (currentStudentId) {
-                        // [แก้ไข] ส่งข้อมูล Rally ไปบันทึก
-                        // @ts-ignore
-                        StorageService.addSession(currentStudentId, { 
-                            sessionId: Date.now().toString(), 
-                            date: new Date().toISOString().split('T')[0], 
-                            timestamp: new Date().toISOString(), 
-                            score: score, 
-                            realScore: score, 
-                            bonusScore: 0,
-                            mode: gameMode, 
-                            details: sessionDetails, // ส่ง Details ที่สะสมมา
-                            // @ts-ignore
-                            gameType: 'RALLY', 
-                            // @ts-ignore
-                            totalDistance: dist
-                        });
-                      }
-                      setScreen('RETURNING'); 
-                      setSelectedTheme(null);
-                }}
+                  if (currentStudentId) {
+                      // [แก้] เพิ่ม currentStudentId === '00' ? guestName : '' เป็นตัวที่ 3
+                      StorageService.addSession(
+                          currentStudentId, 
+                          { 
+                              sessionId: Date.now().toString(), 
+                              date: new Date().toISOString().split('T')[0], 
+                              timestamp: new Date().toISOString(), 
+                              score: score, 
+                              realScore: score, 
+                              bonusScore: 0,
+                              mode: gameMode, 
+                              details: sessionDetails,
+                              // @ts-ignore
+                              gameType: 'RALLY', 
+                              // @ts-ignore
+                              totalDistance: dist
+                          }, 
+                          currentStudentId === '00' ? guestName : '' // <--- ใส่ตรงนี้ (ในวงเล็บ)
+                      );
+                  }
+                  setScreen('RETURNING'); 
+                  setSelectedTheme(null);
+              }}
                 onExit={() => setScreen('RETURNING')}
              />
           );
@@ -560,25 +563,28 @@ export function App() {
                 onTurnComplete={(p) => setGamePlayers(p)} 
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
                 onGameEnd={() => { 
-                    if (currentStudentId) {
-                    // [แก้ไข] ส่งข้อมูล Classic ไปบันทึก
-                    // @ts-ignore
-                    StorageService.addSession(currentStudentId, { 
-                        sessionId: Date.now().toString(), 
-                        date: new Date().toISOString().split('T')[0], 
-                        timestamp: new Date().toISOString(), 
-                        score: gamePlayers[0].score, 
-                        mode: gameMode, 
-                        details: sessionDetails,
-                        // @ts-ignore
-                        gameType: 'CLASSIC',
-                        // @ts-ignore
-                        totalDistance: 0
-                    });
-                    }
-                    setScreen('RETURNING'); 
-                    setSelectedTheme(null); 
-                }} 
+                  if (currentStudentId) {
+                      // [แก้] เพิ่ม currentStudentId === '00' ? guestName : '' เป็นตัวที่ 3
+                      StorageService.addSession(
+                          currentStudentId, 
+                          { 
+                              sessionId: Date.now().toString(), 
+                              date: new Date().toISOString().split('T')[0], 
+                              timestamp: new Date().toISOString(), 
+                              score: gamePlayers[0].score, 
+                              mode: gameMode, 
+                              details: sessionDetails,
+                              // @ts-ignore
+                              gameType: 'CLASSIC',
+                              // @ts-ignore
+                              totalDistance: 0
+                          }, 
+                          currentStudentId === '00' ? guestName : '' // <--- ใส่ตรงนี้ (ในวงเล็บ)
+                      );
+                  }
+                  setScreen('RETURNING'); 
+                  setSelectedTheme(null); 
+              }} 
                 onExit={() => setScreen('RETURNING')} 
             />
           );

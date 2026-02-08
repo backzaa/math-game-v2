@@ -63,6 +63,7 @@ interface Props {
 export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
   const [activeTab, setActiveTab] = useState<UserRole>('STUDENT');
   const [studentId, setStudentId] = useState('');
+  const [guestNameInput, setGuestNameInput] = useState('');
   
   // State ควบคุม Animation
   const [showCard, setShowCard] = useState(false); 
@@ -170,22 +171,36 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
                 {activeTab === 'STUDENT' ? (
                 <div 
-                    key="student-form" 
-                    className="space-y-6"
-                    style={{ animation: 'slide-in-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards' }}
-                >
-                    <div className="relative">
-                        <User className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-400" size={24}/>
+                key="student-form" 
+                className="space-y-6"
+                style={{ animation: 'slide-in-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards' }}
+            >
+                <div className="relative">
+                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-400" size={24}/>
+                    <input 
+                        type="text" 
+                        inputMode="numeric" 
+                        value={studentId} 
+                        onChange={(e)=>setStudentId(e.target.value.replace(/\D/g,''))} 
+                        className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl py-5 pl-14 pr-4 text-white text-xl font-bold focus:border-blue-500 outline-none transition-all placeholder:text-lg placeholder:font-bold leading-[3rem]" 
+                        placeholder="ใส่เลขที่ตนเอง" 
+                    />
+                </div>
+
+                {/* [เพิ่ม] เงื่อนไข: ถ้าใส่เลข 00 ให้โชว์ช่องกรอกชื่อ */}
+                {studentId === '00' ? (
+                    <div className="relative mt-4 animate-pop-in">
+                        <User className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-400" size={24}/>
                         <input 
                             type="text" 
-                            inputMode="numeric" 
-                            value={studentId} 
-                            onChange={(e)=>setStudentId(e.target.value.replace(/\D/g,''))} 
-                            className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl py-5 pl-14 pr-4 text-white text-xl font-bold focus:border-blue-500 outline-none transition-all placeholder:text-lg placeholder:font-bold leading-[3rem]" 
-                            placeholder="ใส่เลขที่ตนเอง" 
+                            value={guestNameInput} 
+                            onChange={(e)=>setGuestNameInput(e.target.value)} 
+                            className="w-full bg-slate-900 border-2 border-pink-500/50 rounded-2xl py-5 pl-14 pr-4 text-white text-xl font-bold focus:border-pink-500 outline-none transition-all placeholder:text-lg placeholder:font-bold leading-[3rem]" 
+                            placeholder="ชื่อเล่น (เช่น อัครเดช , พรประภา)" 
+                            autoFocus
                         />
                     </div>
-
+                ) : (
                     <div className="mt-4 mb-2 flex justify-center">
                         <div 
                             className="bg-yellow-500/20 border-2 border-yellow-400/50 rounded-xl px-4 py-2 shadow-[0_0_15px_rgba(250,204,21,0.3)] backdrop-blur-sm"
@@ -196,22 +211,33 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                             </p>
                         </div>
                     </div>
+                )}
 
-                    <button 
-                        onClick={() => { 
-                                if (studentId === '00') {
-                                    onLogin('STUDENT', '00', 'ผู้มาเยือน', displayData?.avatar);
-                                } else if (displayData?.student) {
-                                    onLogin('STUDENT', studentId);
-                                } else {
-                                    alert('ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบเลขที่');
+                <button 
+                    onClick={() => { 
+                            if (studentId === '00') {
+                                if (!guestNameInput.trim()) {
+                                    alert('กรุณากรอกชื่อก่อนเริ่มเกมครับ');
+                                    return;
                                 }
-                            }} 
-                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-4 rounded-2xl text-xl shadow-lg border-b-4 border-indigo-800 transition-transform active:scale-95"
-                    >
-                        เข้าสู่ระบบ
-                    </button>
-                </div>
+                                // ส่งชื่อและรูปที่สุ่มได้ไปที่ App.tsx
+                                onLogin('STUDENT', '00', guestNameInput, displayData?.avatar);
+                            } else if (displayData?.student) {
+                                onLogin('STUDENT', studentId);
+                            } else {
+                                alert('ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบเลขที่');
+                            }
+                        }} 
+                    className={`w-full font-bold py-4 rounded-2xl text-xl shadow-lg border-b-4 transition-transform active:scale-95 mt-6
+                        ${(studentId === '00' && !guestNameInput.trim()) 
+                            ? 'bg-slate-700 text-slate-500 border-slate-900 cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-indigo-800'
+                        }`}
+                    disabled={studentId === '00' && !guestNameInput.trim()}
+                >
+                    เข้าสู่ระบบ
+                </button>
+            </div>
                 ) : (
                 <form 
                     key="teacher-form"
