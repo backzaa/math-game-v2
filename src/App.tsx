@@ -518,13 +518,15 @@ export function App() {
 
     if (screen === 'GAME' && selectedTheme) {
       if (gameType === 'RALLY') {
-          return (
-             <SmartBoard 
-                player={gamePlayers[0]}
-                theme={selectedTheme}
-                questions={activeGameQuestions}
-                onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} // [เพิ่ม] รับค่า Details
-                onGameEnd={(dist, score) => {
+        return (
+          <SmartBoard 
+              player={gamePlayers[0]}
+              theme={selectedTheme}
+              questions={activeGameQuestions}
+              mode={gameMode} 
+              onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])}
+              onGameEnd={(dist, score) => {
+                  // ... (โค้ดข้างในเหมือนเดิม)
                   if (currentStudentId) {
                       // [แก้] เพิ่ม currentStudentId === '00' ? guestName : '' เป็นตัวที่ 3
                       StorageService.addSession(

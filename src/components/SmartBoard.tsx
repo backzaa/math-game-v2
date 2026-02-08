@@ -7,13 +7,14 @@ import { Trophy, LogOut, Settings, Home, Dices, Footprints, Zap, PlayCircle, Sta
 import confetti from 'canvas-confetti';
 
 interface Props {
-  player: PlayerState;
-  theme: ThemeConfig;
-  questions: MathQuestion[];
-  onGameEnd: (finalDistance: number, score: number) => void;
-  onExit: () => void;
-  onQuestionAnswered: (detail: QuestionDetail) => void; 
-}
+    player: PlayerState;
+    theme: ThemeConfig;
+    questions: MathQuestion[];
+    mode: string; // [เพิ่ม] รับค่าโหมดเกม (CLASSROOM / FREEPLAY)
+    onGameEnd: (finalDistance: number, score: number) => void;
+    onExit: () => void;
+    onQuestionAnswered: (detail: QuestionDetail) => void; 
+  }
 
 const SFX = {
   WIN: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3',
@@ -79,12 +80,13 @@ const VideoLayer = ({
 };
 
 export const SmartBoard: React.FC<Props> = ({ 
-  player, theme, questions,
-  onGameEnd, onExit, onQuestionAnswered 
-}) => {
-  
-  // --- STATE ---
-  const [totalDistance, setTotalDistance] = useState(0);
+    player, theme, questions, mode, // [เพิ่ม] รับ mode เข้ามา
+    onGameEnd, onExit, onQuestionAnswered 
+  }) => {
+    
+    // --- STATE ---
+    const [calcLeft, setCalcLeft] = useState(2); // [เพิ่ม] ตัวนับสิทธิ์เครื่องคิดเลข
+    const [totalDistance, setTotalDistance] = useState(0);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [currentScore, setCurrentScore] = useState(player.score);
   
@@ -199,12 +201,13 @@ export const SmartBoard: React.FC<Props> = ({
   // --- GAME LOGIC ---
 
   const handleStartGame = () => {
-      setHasInteracted(true);
-      setGameState('PLAYING');
-      setRunnerState('IDLE');
-      setVisualEnergy(10); 
-      setCurrentQuestionIdx(0);
-      processingRef.current = false;
+    setHasInteracted(true);
+    setGameState('PLAYING');
+    setRunnerState('IDLE');
+    setVisualEnergy(10); 
+    setCalcLeft(2); // [เพิ่ม] รีเซ็ตเครื่องคิดเลขให้เต็ม 2 ครั้ง
+    setCurrentQuestionIdx(0);
+    processingRef.current = false;
       
       if (activePlaylist.length > 0) {
           const randomIndex = Math.floor(Math.random() * activePlaylist.length);
@@ -542,8 +545,10 @@ export const SmartBoard: React.FC<Props> = ({
             question={activeQuestion} 
             onAnswer={handleAnswer} 
             volume={sfxVolume} 
-            calculatorUsesLeft={2}
-            onConsumeCalculator={()=>{}}
+            // [แก้ไข] ถ้าเป็นโหมด CLASSROOM ให้เป็น 0 (ใช้ไม่ได้) ถ้าไม่ใช่ให้ใช้ค่าคงเหลือ
+            calculatorUsesLeft={mode === 'CLASSROOM' ? 0 : calcLeft}
+            // [แก้ไข] เมื่อกดใช้ ให้ลดจำนวนลง 1
+            onConsumeCalculator={() => setCalcLeft(prev => prev - 1)}
             compact={true} 
           />
       )}
