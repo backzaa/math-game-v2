@@ -112,37 +112,82 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   };
 
   const handleGenerateRandom = () => { 
-      const generated: MathQuestion[] = [];
-      const ops: string[] = [];
-      if (randomConfig.operators.add) ops.push('+');
-      if (randomConfig.operators.sub) ops.push('-');
-      if (randomConfig.operators.mul) ops.push('×');
-      if (randomConfig.operators.div) ops.push('÷');
+    const generated: MathQuestion[] = [];
+    const ops: string[] = [];
+    if (randomConfig.operators.add) ops.push('+');
+    if (randomConfig.operators.sub) ops.push('-');
+    if (randomConfig.operators.mul) ops.push('×');
+    if (randomConfig.operators.div) ops.push('÷');
 
-      if (ops.length === 0) { alert('กรุณาเลือกเครื่องหมายอย่างน้อย 1 อย่าง'); return; }
-      
-      const count = questionSettingMode === 'CLASSROOM' ? 10 : randomConfig.count; 
-      
-      for(let i=0; i < count; i++) { 
-          const op = ops[Math.floor(Math.random() * ops.length)];
-          let a = Math.floor(Math.random() * (randomConfig.max - randomConfig.min + 1)) + randomConfig.min;
-          let b = Math.floor(Math.random() * (randomConfig.max - randomConfig.min + 1)) + randomConfig.min;
-          
-          let qStr = '', ans = 0;
-          if (op === '+') { ans = a + b; qStr = `${a} + ${b}`; }
-          else if (op === '-') { if (a < b) [a, b] = [b, a]; ans = a - b; qStr = `${a} - ${b}`; }
-          else if (op === '×') { ans = a * b; qStr = `${a} × ${b}`; }
-          else if (op === '÷') { ans = a; a = a * b; qStr = `${a} ÷ ${b}`; }
+    if (ops.length === 0) { alert('กรุณาเลือกเครื่องหมายอย่างน้อย 1 อย่าง'); return; }
+    
+    const count = questionSettingMode === 'CLASSROOM' ? 10 : randomConfig.count; 
+    
+    // ใช้ Set เพื่อจำ "รูปแบบโจทย์" (Key) แทนจำโจทย์ตรงๆ
+    const usedKeys = new Set<string>();
+    let attempts = 0; 
 
-          const options = new Set<number>([ans]);
-          while(options.size < 4) {
-              const fake = ans + (Math.floor(Math.random() * 11) - 5);
-              if (fake >= 0 && fake !== ans) options.add(fake);
-          }
-          generated.push({ id: Date.now() + '_' + i, question: qStr, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) });
-      } 
-      setGeneratedQuestions(generated); 
-  };
+    while (generated.length < count && attempts < 1000) { 
+        attempts++;
+        const op = ops[Math.floor(Math.random() * ops.length)];
+        let a = Math.floor(Math.random() * (randomConfig.max - randomConfig.min + 1)) + randomConfig.min;
+        let b = Math.floor(Math.random() * (randomConfig.max - randomConfig.min + 1)) + randomConfig.min;
+        
+        let qStr = '', ans = 0;
+        let uniqueKey = ''; // ตัวแปรสำหรับเช็คความซ้ำที่แท้จริง
+
+        if (op === '+') { 
+            ans = a + b; 
+            qStr = `${a} + ${b}`;
+            // บวก: สลับที่ได้ ให้เรียงเลขน้อยไว้หน้าเสมอตอนเช็คซ้ำ (15+32 หรือ 32+15 จะได้คีย์เดียวกัน)
+            uniqueKey = `+:${Math.min(a,b)},${Math.max(a,b)}`; 
+        }
+        else if (op === '-') { 
+            // ลบ: สลับที่ไม่ได้ แต่ต้องไม่ติดลบ (a ต้องมากกว่าหรือเท่ากับ b)
+            if (a < b) [a, b] = [b, a]; 
+            ans = a - b; 
+            qStr = `${a} - ${b}`;
+            uniqueKey = `-:${a},${b}`;
+        }
+        else if (op === '×') { 
+            ans = a * b; 
+            qStr = `${a} × ${b}`; 
+            // คูณ: สลับที่ได้ เรียงเลขน้อยไว้หน้าเหมือนบวก
+            uniqueKey = `*:${Math.min(a,b)},${Math.max(a,b)}`; 
+        }
+        else if (op === '÷') { 
+            // หาร: ต้องลงตัวเสมอ 
+            // (เทคนิค: ให้ a เป็นผลลัพธ์, b เป็นตัวหาร แล้วคูณกลับไปหาตัวตั้ง)
+            // a = คำตอบ (สุ่มมา), b = ตัวหาร (สุ่มมา)
+            // ตัวตั้ง (Dividend) = a * b
+            // โจทย์คือ (a*b) ÷ b = a
+            const dividend = a * b;
+            ans = a; 
+            qStr = `${dividend} ÷ ${b}`; 
+            uniqueKey = `/:${dividend},${b}`;
+        }
+
+        // [สำคัญ] เช็คจาก uniqueKey แทน qStr
+        if (usedKeys.has(uniqueKey)) continue;
+
+        usedKeys.add(uniqueKey);
+
+        const options = new Set<number>([ans]);
+        while(options.size < 4) {
+            // สร้างตัวลวง (ระวังไม่ให้ติดลบ)
+            const offset = (Math.floor(Math.random() * 11) - 5); // -5 ถึง +5
+            const fake = ans + offset;
+            if (fake >= 0 && fake !== ans) options.add(fake);
+        }
+        generated.push({ id: Date.now() + '_' + generated.length, question: qStr, answer: ans, options: Array.from(options).sort(() => Math.random() - 0.5) });
+    } 
+
+    if (generated.length < count) {
+        alert(`ระบบสร้างได้เพียง ${generated.length} ข้อที่ไม่ซ้ำกัน (กรุณาขยายช่วงตัวเลขให้กว้างขึ้น)`);
+    }
+
+    setGeneratedQuestions(generated); 
+};
 
   const handleAddCustom = () => {
     if (!newCustomQ.q || newCustomQ.opts.some(o => o === '')) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
