@@ -522,7 +522,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                          </div>
                       </div>
                       <div className="space-y-6">
-                        {selectedStudent.sessions && selectedStudent.sessions.filter(s => s.mode === reportMode).length > 0 ? (
+                      {selectedStudent.sessions && selectedStudent.sessions.filter(s => s.mode === reportMode).length > 0 ? (
                           selectedStudent.sessions.filter(s => s.mode === reportMode).slice().reverse().map((sess, idx) => (
                             <div key={idx} className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden shadow-lg transition hover:border-blue-500/30">
                                <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700 cursor-pointer" onClick={() => toggleSessionDetails(sess.sessionId)}>
@@ -533,9 +533,9 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                      
                                      {/* ป้ายบอกโหมด */}
                                      {/* @ts-ignore */}
-                                     <span className={`text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${(sess as any).gameType === 'RALLY' ? 'bg-orange-900/50 border-orange-500 text-orange-400' : 'bg-blue-900/50 border-blue-500 text-blue-400'}`}>
+                                     <span className={`text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${((sess as any).gameType || '').toUpperCase() === 'RALLY' ? 'bg-orange-900/50 border-orange-500 text-orange-400' : 'bg-blue-900/50 border-blue-500 text-blue-400'}`}>
                                         {/* @ts-ignore */}
-                                        {(sess as any).gameType === 'RALLY' ? <><Flag size={10}/> แข่งระยะทาง</> : <><Map size={10}/> ผจญภัย</>}
+                                        {((sess as any).gameType || '').toUpperCase() === 'RALLY' ? <><Flag size={10}/> แข่งระยะทาง</> : <><Map size={10}/> ผจญภัย</>}
                                      </span>
                                   </div>
 
@@ -544,7 +544,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                         {/* ส่วนแสดงรายละเอียดคะแนน (แยกตามโหมด) */}
                                         <div className="flex flex-wrap justify-end gap-2 text-[10px] md:text-[11px] font-bold">
                                             {/* @ts-ignore */}
-                                            {(sess as any).gameType === 'RALLY' ? (
+                                            {((sess as any).gameType || '').toUpperCase() === 'RALLY' ? (
                                                 // === RALLY MODE ===
                                                 <>
                                                    <span className="text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-full border border-orange-400/20 flex items-center gap-1">
@@ -566,10 +566,10 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                         {/* คะแนนรวมตัวใหญ่ */}
                                         <div className="flex flex-col items-end">
                                             {/* @ts-ignore */}
-                                            <div className="text-3xl font-black text-white drop-shadow-md leading-none">{(sess as any).gameType === 'RALLY' ? sess.realScore : sess.score}</div>
+                                            <div className="text-3xl font-black text-white drop-shadow-md leading-none">{((sess as any).gameType || '').toUpperCase() === 'RALLY' ? sess.realScore : sess.score}</div>
                                             <div className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">
                                                 {/* @ts-ignore */}
-                                                {(sess as any).gameType === 'RALLY' ? 'คะแนนที่ได้' : 'ผลรวมครั้งนี้'}
+                                                {((sess as any).gameType || '').toUpperCase() === 'RALLY' ? 'คะแนนที่ได้' : 'ผลรวมครั้งนี้'}
                                             </div>
                                         </div>
                                      </div>
@@ -587,7 +587,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                   </div>
                                </div>
                                
-                               {/* ส่วนรายละเอียด (Details) - คงเดิม */}
+                               {/* ส่วนรายละเอียด (Details) */}
                                {expandedSessions.has(sess.sessionId) && (
                                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30 animate-pop-in">
                                       {sess.details?.map((d, dIdx) => (
@@ -599,6 +599,9 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                            </div>
                                         </div>
                                       ))}
+                                      {(!sess.details || sess.details.length === 0) && (
+                                          <div className="col-span-2 text-center text-slate-500 italic py-2">ไม่มีข้อมูลรายละเอียดการตอบ</div>
+                                      )}
                                    </div>
                                )}
                             </div>

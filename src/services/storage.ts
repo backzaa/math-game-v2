@@ -4,7 +4,7 @@ const STORAGE_KEY = 'math_adventure_students';
 const DAILY_QUESTIONS_KEY = 'math_adventure_daily_questions';
 const FREEPLAY_QUESTIONS_KEY = 'math_adventure_freeplay_questions'; 
 const GAME_CONFIG_KEY = 'math_adventure_config';
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx2ABHg3iQAzR1Tlj-2b1yLfXae_RXDErZjGLXrFLNR0cF5RzIq3PDEklhVPhsL62DK/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlqlx3vx-z0t1hMQPB_NWOS3wCpXBr682BZMa6hxJpQRyxoxzd5zkaSCNCY64WsiE2/exec";
 
 const formatImageLink = (url: string) => {
     if (!url) return '';
