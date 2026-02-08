@@ -41,7 +41,7 @@ const GAME_CONFIG = {
 };
 
 export const GameBoard: React.FC<Props> = ({ 
-    players, currentPlayerIndex, theme, questions, // <--- เพิ่มตรงนี้
+    players, currentPlayerIndex, theme, questions, gameMode, // <--- เพิ่มตรงนี้
   onTurnComplete, onQuestionAnswered, onGameEnd, onExit 
 }) => {
   const currentThemeKey = (theme?.id || theme?.bgClass || 'default').toLowerCase().split(' ')[0];
@@ -382,7 +382,21 @@ export const GameBoard: React.FC<Props> = ({
               {activeAssets.bg ? (isVideoBg ? (<video src={activeAssets.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />) : (<img src={activeAssets.bg} alt="Background" className="w-full h-full object-cover z-0" referrerPolicy="no-referrer" />)) : (<div className="w-full h-full" style={{ background: getGradientStyle() }} />)}
               <div className="absolute inset-0 bg-black/50 z-0"></div>
           </div>
-          <button onClick={() => { localStorage.removeItem('math_game_session_players'); localStorage.removeItem('math_game_session_index'); onExit(); }} className="absolute top-4 left-4 z-50 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
+          <button 
+    // [แก้ไข] เช็ค gameMode ถ้าเป็น CLASSROOM ห้ามกด (ห้ามล้าง Session ห้ามออก)
+    onClick={gameMode === 'CLASSROOM' ? undefined : () => { 
+        localStorage.removeItem('math_game_session_players'); 
+        localStorage.removeItem('math_game_session_index'); 
+        onExit(); 
+    }} 
+    className={`absolute top-4 left-4 z-50 p-2 rounded-full transition-colors ${
+        gameMode === 'CLASSROOM' 
+        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' 
+        : 'bg-red-500/20 text-white hover:bg-red-500'
+    }`}
+>
+    <LogOut size={20} />
+</button>
           <div className="relative w-full h-full max-w-[100vh] max-h-[75vw] md:max-w-[calc(80vw-2rem)] md:max-h-[calc(100vh-2rem)] aspect-[4/3] shadow-2xl rounded-3xl overflow-hidden border-4 border-slate-700/50 backdrop-blur-sm m-4">
                 <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none"><path d={pathD} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1, 3" /><path d={pathD} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 {tiles.map((t, i) => {

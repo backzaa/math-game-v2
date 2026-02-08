@@ -507,7 +507,16 @@ export const SmartBoard: React.FC<Props> = ({
       <div className="md:hidden flex flex-col w-full h-full bg-slate-900">
           <div className="h-[20%] w-full relative z-30">
               <TopProfileSection mobileMode={true} />
-              <button onClick={onExit} className="absolute top-2 left-2 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={20} /></button>
+              <button 
+    onClick={mode === 'CLASSROOM' ? undefined : onExit} 
+    className={`absolute top-2 left-2 p-2 rounded-full transition-colors ${
+        mode === 'CLASSROOM' 
+        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' 
+        : 'bg-red-500/20 text-white hover:bg-red-500'
+    }`}
+>
+    <LogOut size={20} />
+</button>
           </div>
           <div className="h-[55%] w-full relative z-10 bg-black">
               <VideoLayer stateKey="IDLE" activeState={runnerState} onVideoEnd={handleVideoFinish} />
@@ -530,7 +539,16 @@ export const SmartBoard: React.FC<Props> = ({
               <VideoLayer stateKey="SPRINT" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <VideoLayer stateKey="FALL" activeState={runnerState} onVideoEnd={handleVideoFinish} />
               <VideoLayer stateKey="FINISHED" activeState={runnerState} onVideoEnd={handleVideoFinish} />
-              <button onClick={onExit} className="absolute top-4 left-4 z-50 bg-red-500/20 p-2 rounded-full text-white hover:bg-red-500 transition-colors"><LogOut size={24} /></button>
+              <button 
+    onClick={mode === 'CLASSROOM' ? undefined : onExit} 
+    className={`absolute top-4 left-4 z-50 p-2 rounded-full transition-colors ${
+        mode === 'CLASSROOM' 
+        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed' 
+        : 'bg-red-500/20 text-white hover:bg-red-500'
+    }`}
+>
+    <LogOut size={24} />
+</button>
           </div>
           <div className="w-[25%] h-full bg-slate-900 border-l-4 border-slate-700 flex flex-col shadow-2xl relative z-20">
               <div className="flex-[0.25] border-b-4 border-slate-700"><TopProfileSection /></div>
