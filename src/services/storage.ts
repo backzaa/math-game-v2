@@ -89,7 +89,6 @@ export const StorageService = {
       }
   },
 
-  // [UPDATED] ฟังก์ชันบันทึกคะแนน
   saveScore: async (
     id: string, 
     name: string, 
@@ -101,7 +100,6 @@ export const StorageService = {
     gameType: string = 'CLASSIC',
     totalDistance: number = 0
   ) => {
-      // กรณีผู้มาเยือน (ID 00)
       if (id === '00') {
           try { 
               await fetch(SCRIPT_URL, { 
@@ -123,7 +121,6 @@ export const StorageService = {
           return; 
       }
 
-      // กรณีนักเรียนปกติ
       const students = StorageService.getAllStudents();
       const idx = students.findIndex(s => String(Number(s.id)) === String(Number(id)));
       
@@ -170,7 +167,6 @@ export const StorageService = {
       }
   },
 
-  // [UPDATED] เพิ่ม studentName ใน addSession
   addSession: async (id: string, sess: GameSession, studentName: string = '') => {
       const realScore = sess.details ? sess.details.reduce((sum, d) => sum + (d.isCorrect ? d.scoreEarned : 0), 0) : 0;
       // @ts-ignore
@@ -196,40 +192,85 @@ export const StorageService = {
   },
 
   syncFromCloud: async () => {
-      try {
-        const resp = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
-        const data = await resp.json();
-        if (data.students) {
-              const students = data.students.map((s: any) => {
-                  const studentScores = data.scores ? data.scores.filter((sc: any) => String(sc.studentId) === String(s.id)) : [];
-                  const totalRealScore = studentScores.reduce((sum: number, sc: any) => sum + (Number(sc.realScore) || 0), 0);
+    try {
+      const resp = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
+      const data = await resp.json();
+      
+      let students: StudentProfile[] = [];
+      if (data.students) {
+            students = data.students.map((s: any) => {
+                const studentScores = data.scores ? data.scores.filter((sc: any) => String(sc.studentId) === String(s.id)) : [];
+                const totalRealScore = studentScores.reduce((sum: number, sc: any) => sum + (Number(sc.realScore) || 0), 0);
 
-                  return {
-                      ...s,
-                      score: totalRealScore, 
-                      profileImage: formatImageLink(s.profileImage || ''),
-                      sessions: studentScores.map((sc: any) => ({
-                          sessionId: sc.timestamp,
-                          date: new Date(sc.timestamp).toLocaleDateString('th-TH'),
-                          timestamp: sc.timestamp,
-                          realScore: Number(sc.realScore) || 0,
-                          bonusScore: Number(sc.bonusScore) || 0,
-                          score: Number(sc.totalScore) || 0,
-                          mode: sc.mode,
-                          details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
-                          gameType: sc.gameType || 'CLASSIC',
-                          totalDistance: Number(sc.totalDistance) || 0
-                      }))
-                  };
-              });
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+                return {
+                    ...s,
+                    score: totalRealScore, 
+                    profileImage: formatImageLink(s.profileImage || ''),
+                    sessions: studentScores.map((sc: any) => ({
+                        sessionId: sc.timestamp,
+                        date: new Date(sc.timestamp).toLocaleDateString('th-TH'),
+                        timestamp: sc.timestamp,
+                        realScore: Number(sc.realScore) || 0,
+                        bonusScore: Number(sc.bonusScore) || 0,
+                        score: Number(sc.totalScore) || 0,
+                        mode: sc.mode,
+                        details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
+                        gameType: sc.gameType || 'CLASSIC',
+                        totalDistance: Number(sc.totalDistance) || 0
+                    }))
+                };
+            });
+      }
+
+      const guestScores = data.scores ? data.scores.filter((sc: any) => String(sc.studentId) === '0' || String(sc.studentId) === '00') : [];
+      
+      if (guestScores.length > 0) {
+          const totalGuestScore = guestScores.reduce((sum: number, sc: any) => sum + (Number(sc.realScore) || 0), 0);
+          
+          const guestStudent: any = {
+              id: '00',
+              firstName: 'ผู้มาเยือน',
+              lastName: '',
+              nickname: 'Guest',
+              gender: 'MALE',
+              classroom: 'ทั่วไป',
+              profileImage: '', 
+              score: totalGuestScore,
+              appearance: { base: 'BOY', skinColor: '#fcd34d' },
+              sessions: guestScores.map((sc: any) => ({
+                  sessionId: sc.timestamp,
+                  date: new Date(sc.timestamp).toLocaleDateString('th-TH'),
+                  timestamp: sc.timestamp,
+                  // [จุดสำคัญ] เพิ่มบรรทัดนี้เพื่อเก็บชื่อ
+                  playedBy: sc.studentName || sc.name || sc.Student_Name,
+                  
+                  realScore: Number(sc.realScore) || 0,
+                  bonusScore: Number(sc.bonusScore) || 0,
+                  score: Number(sc.totalScore) || 0,
+                  mode: sc.mode,
+                  details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
+                  gameType: sc.gameType || 'CLASSIC',
+                  totalDistance: Number(sc.totalDistance) || 0
+              }))
+          };
+          
+          const existingGuestIdx = students.findIndex(s => s.id === '00');
+          if (existingGuestIdx !== -1) {
+              students[existingGuestIdx] = guestStudent;
+          } else {
+              students.push(guestStudent);
           }
-          if (data.settings) localStorage.setItem(GAME_CONFIG_KEY, JSON.stringify(data.settings));
-          if (data.dailyQs) localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(data.dailyQs));
-          if (data.freeplayQs) localStorage.setItem(FREEPLAY_QUESTIONS_KEY, JSON.stringify(data.freeplayQs));
-          return true;
-      } catch (e) { return false; }
-  },
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+        
+      if (data.settings) localStorage.setItem(GAME_CONFIG_KEY, JSON.stringify(data.settings));
+      if (data.dailyQs) localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(data.dailyQs));
+      if (data.freeplayQs) localStorage.setItem(FREEPLAY_QUESTIONS_KEY, JSON.stringify(data.freeplayQs));
+      return true;
+
+    } catch (e) { return false; }
+},
 
   saveDailyQuestions: async (qs: MathQuestion[]) => {
       localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(qs));

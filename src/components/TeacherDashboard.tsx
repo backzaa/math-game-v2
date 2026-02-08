@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode, GameGlobalConfig } from '../types';
-import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock, Flag, Map } from 'lucide-react';
+import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, Clock, BarChart, AlertTriangle, Lock, Flag, Map } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
@@ -64,7 +64,23 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   const THEME_IDS = [{ id: 'jungle', label: 'ป่ามหาสนุก' }, { id: 'space', label: 'ผจญภัยอวกาศ' }, { id: 'boat', label: 'แม่น้ำแสนซน' }, { id: 'ocean', label: 'โลกใต้ทะเล' }, { id: 'volcano', label: 'ภูเขาไฟ' }, { id: 'candy', label: 'เมืองขนมหวาน' }, { id: 'castle', label: 'ปราสาทพาสเทล' }];
 
   const loadDataFromLocal = () => {
-      setStudents(StorageService.getAllStudents());
+    // ดึงข้อมูลนักเรียนทั้งหมดมาก่อน
+    let allStudents = StorageService.getAllStudents();
+    
+    // [เพิ่ม] เช็คว่ามี ID 00 หรือยัง ถ้าไม่มีให้เพิ่มเข้าไปเป็นคนแรก
+    // เพื่อให้ครูสามารถกดดูรายงานของ "ผู้มาเยือน" ได้ แม้จะไม่มีการลงทะเบียนถาวร
+    if (!allStudents.find(s => s.id === '00')) {
+        allStudents = [{
+            id: '00', firstName: 'ผู้มาเยือน', lastName: '', nickname: 'Guest',
+            gender: 'MALE', classroom: '-', profileImage: '', sessions: [], 
+            appearance: { base: 'BOY', skinColor: '#fcd34d' }
+        }, ...allStudents];
+    }
+    
+    // เรียงลำดับ: เอา 00 ไว้บนสุด แล้วตามด้วยเลขที่อื่นๆ (เรียงตามเลข)
+    allStudents.sort((a, b) => Number(a.id) - Number(b.id));
+
+    setStudents(allStudents);
       const cfg = StorageService.getGameConfig();
       if(cfg) {
           setGameConfig({ 
@@ -504,7 +520,19 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-600 border border-white/20">
                              {s.profileImage ? (<img src={s.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />) : (<div className="w-full h-full flex items-center justify-center text-[10px]">{s.id}</div>)}
                            </div>
-                           <div><span className="font-bold">No.{s.id}</span> {s.firstName}</div>
+                           <div>
+                           {/* [แก้ไข] จัดรูปแบบเลขที่ให้มี 0 นำหน้าเสมอ (เช่น No.1 -> No.01) */}
+                           <span className="font-bold text-slate-300">
+                               No.{s.id.toString().padStart(2, '0')}
+                           </span>
+                           
+                           {/* [แก้ไข] ถ้าเป็น 00 ให้ใส่ชื่อในวงเล็บและทำสีชมพู, ถ้าคนอื่นให้แสดงชื่อปกติ */}
+                           {s.id === '00' ? (
+                               <span className="text-pink-400 ml-2 font-bold">({s.firstName})</span>
+                           ) : (
+                               <span className="ml-2">{s.firstName}</span>
+                           )}
+                        </div>
                         </div>
                         <ChevronRight size={16} />
                       </div>
@@ -528,8 +556,17 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                <div className="bg-slate-700/50 p-4 flex justify-between items-center border-b border-slate-700 cursor-pointer" onClick={() => toggleSessionDetails(sess.sessionId)}>
                                   {/* ส่วนแสดงวันที่ เวลา และป้ายกำกับโหมด */}
                                   <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-300">
-                                     <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
-                                     <span className="flex items-center gap-1.5"><Clock size={16}/> {new Date(sess.timestamp).toLocaleTimeString('th-TH')}</span>
+   {/* [แก้ไข] วางชื่อผู้เล่นไว้ตรงนี้ครับ (ก่อนวันที่) */}
+   {selectedStudent.id === '00' && (sess as any).playedBy && (
+       <span className="bg-pink-500/20 text-pink-300 text-xs px-2 py-0.5 rounded-md border border-pink-500/30 font-bold flex items-center">
+           {(sess as any).playedBy}
+       </span>
+   )}
+
+   <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
+   <span className="flex items-center gap-1.5"><Clock size={16}/> {new Date(sess.timestamp).toLocaleTimeString('th-TH')}</span>
+   
+   {/* ... ส่วนป้ายกำกับโหมด RALLY/CLASSIC ... */}
                                      
                                      {/* ป้ายบอกโหมด */}
                                      {/* @ts-ignore */}
@@ -594,8 +631,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                         <div key={dIdx} className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center shadow-inner">
                                            <span className="text-base font-bold font-mono text-slate-200">{d.questionText}</span>
                                            <div className="flex items-center gap-2">
-                                              {d.isCorrect ? <CheckCircle2 size={18} className="text-green-400"/> : <XCircle size={18} className="text-red-400"/>}
-                                              <span className="text-[10px] text-slate-500">+{d.scoreEarned}</span>
+    {/* [เพิ่ม] แสดงชื่อคนเล่น (เฉพาะ ID 00) */}
+    
                                            </div>
                                         </div>
                                       ))}
