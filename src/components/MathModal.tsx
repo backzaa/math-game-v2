@@ -86,11 +86,11 @@ export const MathModal: React.FC<Props> = ({ question, onAnswer, volume, calcula
   };
 
   const overlayClass = compact 
-    ? "fixed inset-0 z-[1000] flex items-end justify-center pb-6 pointer-events-none" 
+    ? "fixed inset-0 z-[1000] flex items-end justify-center md:justify-end md:pr-[25.5%] pb-6 md:pb-2 pointer-events-none" 
     : "fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 animate-pop-in";
   
-  const containerClass = compact
-    ? "bg-slate-900/90 rounded-t-3xl rounded-b-xl border-2 border-yellow-400/50 w-[95%] max-w-sm px-4 py-6 relative shadow-[0_-10px_40px_rgba(0,0,0,0.8)] backdrop-blur-md pointer-events-auto animate-slide-up mx-auto mb-2"
+    const containerClass = compact
+    ? "bg-slate-900/90 rounded-t-3xl rounded-b-xl border-2 border-yellow-400/50 w-[95%] max-w-sm md:max-w-xs px-4 py-6 relative shadow-[0_-10px_40px_rgba(0,0,0,0.8)] backdrop-blur-md pointer-events-auto animate-slide-up mx-auto md:mx-0 mb-2 md:mb-0"
     : "bg-gradient-to-b from-slate-800 to-slate-900 rounded-3xl border-4 border-slate-600 max-w-2xl w-full p-8 relative shadow-2xl";
   
   const questionTextClass = compact

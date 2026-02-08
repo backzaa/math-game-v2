@@ -89,7 +89,7 @@ export const SmartBoard: React.FC<Props> = ({
   const [currentScore, setCurrentScore] = useState(player.score);
   
   const [visualEnergy, setVisualEnergy] = useState(10); 
-  const [runnerState, setRunnerState] = useState<RunnerState>('IDLE');
+  const [runnerState, setRunnerState] = useState<RunnerState>('RUN');
   
   const [gameState, setGameState] = useState<'READY' | 'PLAYING' | 'QUIZ' | 'ROLL' | 'MOVING' | 'FINISHED'>('READY');
   
@@ -218,11 +218,16 @@ export const SmartBoard: React.FC<Props> = ({
       }
   };
 
-  const showQuestion = () => {
-      setGameState('QUIZ');
-      const q = questions[currentQuestionIdx] || {id:'err', question:'1+1', answer:2, options:[1,2,3,4]};
-      setActiveQuestion(q);
-  };
+  // [แก้บรรทัดนี้] เพิ่ม (targetIdx?: number) เพื่อรับลำดับที่จะเปิด
+  const showQuestion = (targetIdx?: number) => {
+    setGameState('QUIZ');
+    
+    // ถ้าส่งลำดับมาให้ใช้ลำดับนั้น (idx) ถ้าไม่ส่งให้ใช้ตัวปัจจุบัน
+    const idx = typeof targetIdx === 'number' ? targetIdx : currentQuestionIdx;
+    
+    const q = questions[idx] || {id:'err', question:'จบเกมแล้ว', answer:0, options:[0,0,0,0]};
+    setActiveQuestion(q);
+};
 
   const handleAnswer = (correct: boolean) => {
       // ส่งรายละเอียดกลับไปที่ App
@@ -276,27 +281,32 @@ export const SmartBoard: React.FC<Props> = ({
   };
 
   const handleVideoFinish = () => {
-      if (processingRef.current) return;
-      processingRef.current = true;
-      setTimeout(() => { processingRef.current = false; }, 500);
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setTimeout(() => { processingRef.current = false; }, 500);
 
-      if (runnerState === 'IDLE') {
-          setRunnerState('RUN');
-          setTimeout(showQuestion, 1000);
-      }
-      else if (runnerState === 'SPRINT' || runnerState === 'FALL') {
-          if (currentQuestionIdx < 9) {
-              setCurrentQuestionIdx(prev => prev + 1);
-              setRunnerState('RUN'); 
-              setTimeout(showQuestion, 1000);
-          } else {
-              setRunnerState('FINISHED');
-          }
-      }
-      else if (runnerState === 'FINISHED') {
-          finishGame();
-      }
-  };
+    if (runnerState === 'IDLE') {
+        setRunnerState('RUN');
+        // [แก้] บังคับเริ่มที่ลำดับ 0
+        setTimeout(() => showQuestion(0), 1000);
+    }
+    else if (runnerState === 'SPRINT' || runnerState === 'FALL') {
+        // [แก้] เปลี่ยนเลข 9 เป็น questions.length - 1
+        if (currentQuestionIdx < questions.length - 1) {
+            const nextIdx = currentQuestionIdx + 1; // คำนวณลำดับถัดไป
+            setCurrentQuestionIdx(nextIdx);
+            setRunnerState('RUN'); 
+            
+            // [แก้] ส่ง nextIdx ไปบอกให้เปิดข้อถัดไปทันที (ไม่ต้องรอ State)
+            setTimeout(() => showQuestion(nextIdx), 1000); 
+        } else {
+            setRunnerState('FINISHED');
+        }
+    }
+    else if (runnerState === 'FINISHED') {
+        finishGame();
+    }
+};
 
   const animateDistanceVisual = (target: number) => {
       if (distanceIntervalRef.current) clearInterval(distanceIntervalRef.current);
@@ -504,8 +514,9 @@ export const SmartBoard: React.FC<Props> = ({
               <VideoLayer stateKey="FINISHED" activeState={runnerState} onVideoEnd={handleVideoFinish} />
           </div>
           <div className="h-[25%] w-full bg-slate-900 border-t-4 border-slate-700 flex relative z-30">
-              <div className="w-1/2 border-r border-slate-700"><MiddleEnergySection /></div>
-              <div className="w-1/2"><BottomActionSection /></div>
+              {/* [แก้ไข] เรียกใช้แบบฟังก์ชัน เพื่อไม่ให้ Animation รีเซ็ตตอนเลขวิ่ง */}
+              <div className="w-1/2 border-r border-slate-700">{MiddleEnergySection()}</div>
+              <div className="w-1/2">{BottomActionSection()}</div>
           </div>
       </div>
 
@@ -520,8 +531,9 @@ export const SmartBoard: React.FC<Props> = ({
           </div>
           <div className="w-[25%] h-full bg-slate-900 border-l-4 border-slate-700 flex flex-col shadow-2xl relative z-20">
               <div className="flex-[0.25] border-b-4 border-slate-700"><TopProfileSection /></div>
-              <div className="flex-[0.4] border-b-4 border-slate-700"><MiddleEnergySection /></div>
-              <div className="flex-[0.35]"><BottomActionSection /></div>
+              {/* [แก้ไข] เรียกใช้แบบฟังก์ชันเหมือนกัน */}
+              <div className="flex-[0.4] border-b-4 border-slate-700">{MiddleEnergySection()}</div>
+              <div className="flex-[0.35]">{BottomActionSection()}</div>
           </div>
       </div>
 
