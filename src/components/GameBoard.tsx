@@ -14,7 +14,8 @@ interface Props {
   gameMode: ScoringMode;
   onTurnComplete: (newPlayers: PlayerState[], nextIndex: number) => void;
   onQuestionAnswered: (detail: QuestionDetail) => void;
-  onGameEnd: () => void;
+  // [แก้ไข] รับค่า distance และ score เพื่อส่งกลับไปบันทึก
+  onGameEnd: (distance: number, score: number) => void;
   onExit: () => void;
 }
 
@@ -484,7 +485,7 @@ export const GameBoard: React.FC<Props> = ({
   const handleTeacherReset = () => {
     const code = window.prompt("ใส่รหัสลับเพื่อล้างเกม (สำหรับครู):");
     if (code === '9999') {
-        onGameEnd(); // บันทึกคะแนนเท่าที่มี
+        onGameEnd(0, currentPlayer?.score || 0); // บันทึกคะแนนเท่าที่มี
         StorageService.clearGameState(); // ล้างเซฟ
         
         // ล้าง LocalStorage เก่าด้วย
@@ -697,7 +698,16 @@ export const GameBoard: React.FC<Props> = ({
                     <div className="text-slate-400 text-xs uppercase tracking-widest mb-1">คะแนนรวมรอบนี้</div>
                     <div className="text-5xl font-black text-yellow-400 drop-shadow-glow">{currentPlayer?.score}</div>
                 </div>
-                <button onClick={() => { localStorage.removeItem('math_game_session_players'); onGameEnd(); }} className="bg-green-600 w-full py-3 rounded-xl text-lg font-bold text-white shadow-lg transition flex items-center justify-center gap-2"><Home size={20} /> กลับหน้าหลัก</button>
+                <button 
+                    onClick={() => { 
+                        localStorage.removeItem('math_game_session_players'); 
+                        localStorage.removeItem('math_game_session_index');
+                        onGameEnd(0, currentPlayer?.score || 0); 
+                    }} 
+                    className="bg-green-600 w-full py-3 rounded-xl text-lg font-bold text-white shadow-lg transition flex items-center justify-center gap-2"
+                >
+                    <Home size={20} /> กลับหน้าหลัก
+                </button>
              </div>
          </div>
       )}
