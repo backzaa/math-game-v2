@@ -83,18 +83,35 @@ export const GameBoard: React.FC<Props> = ({
   const [audioError, setAudioError] = useState(false);
   const [isVideoBg, setIsVideoBg] = useState(false);
   // ตัวแปรนับว่าตอนนี้ถึงโจทย์ข้อที่เท่าไหร่แล้ว (เริ่มที่ 0)
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-
+  // --- STATE ---
   
+  // 1. ดึงข้อมูล Save มาพักไว้ (ถ้ามี)
+  const savedData = useRef(StorageService.loadGameState()).current;
+
+  // 2. Player: ถ้ามี Save ให้ใช้ Save -> ถ้าไม่มีให้ดู LocalStorage -> ถ้าไม่มีให้ใช้ค่าเริ่มต้น
   const [localPlayers, setLocalPlayers] = useState<PlayerState[]>(() => {
+    if (savedData?.players) return savedData.players;
     const saved = localStorage.getItem('math_game_session_players');
     return saved ? JSON.parse(saved) : players;
   });
-  const [localCurrentIndex, setLocalCurrentIndex] = useState(() => {
+
+  // 3. Current Turn: ใครเล่นอยู่
+  const [localCurrentIndex, setLocalCurrentIndex] = useState<number>(() => {
+    if (savedData?.currentPlayerIndex !== undefined) return savedData.currentPlayerIndex;
     const saved = localStorage.getItem('math_game_session_index');
     return saved ? parseInt(saved) : currentPlayerIndex;
   });
-  const [tiles, setTiles] = useState<TileConfig[]>([]);
+
+  // 4. Tiles (กระดาน): สำคัญมาก! ต้องโหลดกระดานเดิมมา ไม่งั้นแผนที่เปลี่ยน
+  const [tiles, setTiles] = useState<TileConfig[]>(savedData?.tiles || []);
+
+  // 5. Question Index: ข้อที่เท่าไหร่แล้ว
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(savedData?.currentQuestionIndex ?? 0);
+
+  
+  
+  
+  
   const [activeQuestion, setActiveQuestion] = useState<MathQuestion | null>(null);
   const [isMoving, setIsMoving] = useState(false);
   const [pendingSteps, setPendingSteps] = useState(0);
@@ -195,7 +212,8 @@ export const GameBoard: React.FC<Props> = ({
   const handleSelectSong = (index: number) => { setCurrentSongIndex(index); setIsPlaying(true); setShowMusicMenu(false); setAudioError(false); };
   const forcePlayAudio = () => { setAudioError(false); setIsPlaying(true); if(audioRef.current) audioRef.current.play().catch(e => console.error(e)); };
 
-  useEffect(() => { 
+  useEffect(() => { // [แก้ไขจุดที่ 1] ถ้ามีข้อมูล tiles จากเซฟแล้ว ไม่ต้องสร้างใหม่!
+    if (savedData?.tiles && savedData.tiles.length > 0) return;
       const generateCurvedPath = (count: number) => { 
           const points = []; const rows = 5; const cols = Math.ceil(count / rows); 
           for (let i = 0; i < count; i++) { 
@@ -250,7 +268,27 @@ export const GameBoard: React.FC<Props> = ({
       setTiles(pathCoords.map((coord, i) => ({ x: coord.x, y: coord.y, type: finalTypes[i] }))); 
   }, []);
   
-  useEffect(() => { localStorage.setItem('math_game_session_players', JSON.stringify(localPlayers)); localStorage.setItem('math_game_session_index', localCurrentIndex.toString()); }, [localPlayers, localCurrentIndex]);
+  // [แก้ไขจุดที่ 2] Auto-Save แบบครบถ้วน
+  useEffect(() => {
+    if (!gameFinished && gameMode === 'CLASSROOM') {
+        StorageService.saveGameState({
+            // ข้อมูลสำหรับ App.tsx
+            studentId: localPlayers[0]?.id, 
+            guestName: localPlayers[0]?.firstName,
+            gameType: 'CLASSIC', 
+            mode: gameMode,
+            theme: theme,
+            questions: questions,
+            sessionDetails: [],
+
+            // ข้อมูลสำหรับ GameBoard (Resume)
+            players: localPlayers,
+            currentPlayerIndex: localCurrentIndex,
+            currentQuestionIndex: currentQuestionIndex,
+            tiles: tiles // [สำคัญมาก] ต้องบันทึกกระดานไปด้วย
+        });
+    }
+  }, [localPlayers, localCurrentIndex, currentQuestionIndex, tiles, gameFinished, gameMode]);
   useEffect(() => { playersRef.current = localPlayers; }, [localPlayers]);
   
   const playSfx = (url: string) => { 
@@ -357,6 +395,23 @@ export const GameBoard: React.FC<Props> = ({
   };
   
   const handleConsumeCalculator = () => { const newPlayers = [...playersRef.current]; if (newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; setLocalPlayers(newPlayers); } };
+  // [Step 3] ฟังก์ชันล้างเกม (วางต่อจาก handleConsumeCalculator)
+  const handleTeacherReset = () => {
+    const code = window.prompt("ใส่รหัสลับเพื่อล้างเกม (สำหรับครู):");
+    if (code === '9999') {
+        onGameEnd(); // บันทึกคะแนนเท่าที่มี
+        StorageService.clearGameState(); // ล้างเซฟ
+        
+        // ล้าง LocalStorage เก่าด้วย
+        localStorage.removeItem('math_game_session_players');
+        localStorage.removeItem('math_game_session_index');
+        
+        alert("✅ ล้างเกมเรียบร้อย! ระบบจะรีเซ็ตตัวเอง...");
+        window.location.reload();
+    } else if (code !== null) {
+        alert("❌ รหัสไม่ถูกต้องครับ!");
+    }
+  };
   
   const generateSvgPath = (coords: {x:number, y:number}[]) => { if (coords.length === 0) return ""; let d = `M ${coords[0].x} ${coords[0].y}`; for (let i = 0; i < coords.length - 1; i++) { const next = coords[i+1]; d += ` L ${next.x} ${next.y}`; } return d; };
   const pathD = generateSvgPath(tiles);
@@ -373,7 +428,43 @@ export const GameBoard: React.FC<Props> = ({
       <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
           {activeAssets.bgmPlaylist.length > 0 && (<div className="relative"><button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} /></button>{showMusicMenu && (<div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]"><div className="flex gap-2 mb-2"><button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button><button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button></div><div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">{activeAssets.bgmPlaylist.map((_, idx) => (<button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>🎵 เพลงที่ {idx + 1}</button>))}</div></div>)}</div>)}
           <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Settings size={20} /></button>
-          {showSettings && (<div className="bg-slate-900/90 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000]"><div className="mb-4 text-xs"><span>BGM</span><input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div><div className="text-xs"><span>SFX</span><input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div></div>)}
+          {showSettings && (
+              <div className="absolute top-0 right-14 bg-slate-900/95 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000] animate-fade-in">
+                  <div className="text-xs font-bold text-slate-400 uppercase mb-2">Audio Settings</div>
+                  
+                  {/* ส่วนปรับเสียงเดิม */}
+                  <div className="mb-4 text-xs">
+                      <span>BGM</span>
+                      <input 
+                          type="range" min="0" max="1" step="0.1" 
+                          value={bgmVolume} 
+                          onChange={(e) => setBgmVolume(parseFloat(e.target.value))} 
+                          className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" 
+                      />
+                  </div>
+                  <div className="text-xs">
+                      <span>SFX</span>
+                      <input 
+                          type="range" min="0" max="1" step="0.1" 
+                          value={sfxVolume} 
+                          onChange={(e) => setSfxVolume(parseFloat(e.target.value))} 
+                          className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" 
+                      />
+                  </div>
+
+                  {/* [ส่วนที่เพิ่มใหม่] ปุ่มล้างเกม (เฉพาะโหมดห้องเรียน) */}
+                  {gameMode === 'CLASSROOM' && (
+                      <div className="mt-4 pt-3 border-t border-slate-700">
+                          <button 
+                              onClick={handleTeacherReset}
+                              className="w-full bg-red-900/50 hover:bg-red-700 text-red-200 text-xs py-2 rounded-lg border border-red-800 transition-colors font-bold flex items-center justify-center gap-2"
+                          >
+                              ⚠️ ล้างเกม (ครู)
+                          </button>
+                      </div>
+                  )}
+              </div>
+          )}
       </div>
 
       {/* --- BOARD SECTION --- */}
