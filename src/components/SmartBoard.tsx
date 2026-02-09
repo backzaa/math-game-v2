@@ -85,21 +85,36 @@ export const SmartBoard: React.FC<Props> = ({
   }) => {
     
     // --- STATE ---
-    const [calcLeft, setCalcLeft] = useState(2); // [เพิ่ม] ตัวนับสิทธิ์เครื่องคิดเลข
-    const [totalDistance, setTotalDistance] = useState(0);
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [currentScore, setCurrentScore] = useState(player.score);
-  
-  const [visualEnergy, setVisualEnergy] = useState(10); 
-  const [runnerState, setRunnerState] = useState<RunnerState>('RUN');
-  
-  const [gameState, setGameState] = useState<'READY' | 'PLAYING' | 'QUIZ' | 'ROLL' | 'MOVING' | 'FINISHED'>('READY');
+// 1. ดึงเซฟมาพักไว้ในตัวแปรนี้ก่อน
+const savedData = useRef(StorageService.loadGameState()).current;
+
+// 2. เช็คว่าถ้ามี savedData ให้ใช้ค่าเก่า ถ้าไม่มีให้ใช้ค่าเริ่มต้น
+// [แก้ไข] เติม <number> เพื่อบอก TypeScript ว่าตัวแปรพวกนี้คือตัวเลขแน่นอน
+const [calcLeft, setCalcLeft] = useState<number>(savedData?.calcLeft ?? 2); 
+const [totalDistance, setTotalDistance] = useState<number>(savedData?.totalDistance ?? 0);
+const [currentQuestionIdx, setCurrentQuestionIdx] = useState<number>(savedData?.currentQuestionIdx ?? 0);
+const [currentScore, setCurrentScore] = useState<number>(savedData?.currentScore ?? player.score);
+
+const [visualEnergy, setVisualEnergy] = useState<number>(savedData?.visualEnergy ?? 10); 
+// [แก้ไข] ถ้ามีเซฟ ให้ยืนเฉยๆ (IDLE) รอตอบคำถาม
+const [runnerState, setRunnerState] = useState<RunnerState>('RUN');
+
+// ถ้ามีเซฟ ให้ข้ามสถานะ READY ไปเป็น PLAYING เลย
+// [แก้ไข] ถ้ามีเซฟ ให้เข้าโหมด 'QUIZ' (ตอบคำถาม) ทันที เพื่อให้ Pop-up เด้งขึ้นมา
+const [gameState, setGameState] = useState<'READY' | 'PLAYING' | 'QUIZ' | 'ROLL' | 'MOVING' | 'FINISHED'>(
+    savedData ? 'QUIZ' : 'READY'
+);
   
   const [displayNumber, setDisplayNumber] = useState(1);
   const [isSpinning, setIsSpinning] = useState(false);
   const spinIntervalRef = useRef<any>(null);
   const distanceIntervalRef = useRef<any>(null);
-  const [activeQuestion, setActiveQuestion] = useState<MathQuestion | null>(null);
+  // [แก้ไข] ถ้ามีเซฟ ให้ดึงโจทย์ข้อปัจจุบันมารอไว้เลย ไม่งั้นเป็น null
+const [activeQuestion, setActiveQuestion] = useState<MathQuestion | null>(
+    (savedData && questions[savedData.currentQuestionIdx]) 
+    ? questions[savedData.currentQuestionIdx] 
+    : null
+);
   
   // --- Audio State ---
   const [bgmVolume, setBgmVolume] = useState(0.5);
@@ -150,21 +165,29 @@ export const SmartBoard: React.FC<Props> = ({
   // ... (หลัง useEffect ของ Audio)
 
   // [เพิ่มใหม่ Step 2] Auto-Save ทุกครั้งที่ค่าสำคัญเปลี่ยน
-  useEffect(() => {
-    // บันทึกเฉพาะตอนเล่นเกมอยู่ (ไม่ใช่ตอนจบ หรือตอนเริ่ม)
+  // [แก้ไข] Auto-Save ให้ครบถ้วน
+useEffect(() => {
     if (gameState !== 'READY' && gameState !== 'FINISHED' && mode === 'CLASSROOM') {
         StorageService.saveGameState({
+            // ส่วนที่ 1: ข้อมูลสำหรับ App.tsx (เพื่อวาร์ปเข้าเกม)
             studentId: player.id,
-            guestName: player.firstName, // หรือ nickname
+            guestName: player.firstName,
             gameType: 'RALLY',
             mode: mode,
             theme: theme,
             questions: questions,
-            players: [player], // บันทึก Player ปัจจุบันที่มีคะแนนล่าสุด
-            sessionDetails: [] // จริงๆ ควรส่ง sessionDetails มาด้วย แต่เอาแค่นี้ก่อนเพื่อ Resume
+            players: [player],
+            sessionDetails: [],
+  
+            // ส่วนที่ 2: ข้อมูลสำหรับ SmartBoard (เพื่อเล่นต่อจุดเดิม) <-- สำคัญมาก
+            currentQuestionIdx: currentQuestionIdx,
+            totalDistance: totalDistance,
+            currentScore: currentScore,
+            visualEnergy: visualEnergy,
+            calcLeft: calcLeft
         });
     }
-  }, [totalDistance, currentScore, currentQuestionIdx, gameState]);
+  }, [totalDistance, currentScore, currentQuestionIdx, gameState, visualEnergy, calcLeft]); // เพิ่ม dependency ให้ครบ
 
   useEffect(() => {
     if (audioRef.current && activePlaylist.length > 0) {
@@ -221,41 +244,64 @@ export const SmartBoard: React.FC<Props> = ({
 
   const handleStartGame = () => {
     setHasInteracted(true);
+
+    // [แก้ไขจุดสำคัญ!] เช็คก่อนว่ามีเซฟเกมไหม? ถ้ามีห้ามรีเซ็ตค่า!
+    if (savedData) {
+        // ถ้ามีเซฟ ให้เล่นเพลงแล้วจบฟังก์ชันเลย (ใช้ค่าเดิมที่โหลดมา)
+        if (activePlaylist.length > 0) {
+            const randomIndex = Math.floor(Math.random() * activePlaylist.length);
+            setCurrentSongIndex(randomIndex);
+            setIsPlaying(true);
+            
+            if (audioRef.current) {
+                audioRef.current.src = getDirectAudioLink(activePlaylist[randomIndex]);
+                audioRef.current.play().catch(e => console.error("Start play error:", e));
+            }
+        }
+        return; // *** จบตรงนี้เลย ห้ามวิ่งลงไปบรรทัดล่าง ***
+    }
+
+    // --- ถ้าไม่มีเซฟ ถึงจะให้เริ่มใหม่ ---
     setGameState('PLAYING');
     setRunnerState('IDLE');
     setVisualEnergy(10); 
-    setCalcLeft(2); // [เพิ่ม] รีเซ็ตเครื่องคิดเลขให้เต็ม 2 ครั้ง
-    setCurrentQuestionIdx(0);
+    setCalcLeft(2); 
+    setCurrentQuestionIdx(0); // <--- บรรทัดนี้แหละครับตัวการ
     processingRef.current = false;
       
-      if (activePlaylist.length > 0) {
-          const randomIndex = Math.floor(Math.random() * activePlaylist.length);
-          setCurrentSongIndex(randomIndex);
-          setIsPlaying(true);
-          
-          if (audioRef.current) {
-              audioRef.current.src = getDirectAudioLink(activePlaylist[randomIndex]);
-              audioRef.current.play().catch(e => console.error("Start play error:", e));
-          }
-      }
+    if (activePlaylist.length > 0) {
+         const randomIndex = Math.floor(Math.random() * activePlaylist.length);
+         setCurrentSongIndex(randomIndex);
+         setIsPlaying(true);
+         
+         if (audioRef.current) {
+             audioRef.current.src = getDirectAudioLink(activePlaylist[randomIndex]);
+             audioRef.current.play().catch(e => console.error("Start play error:", e));
+         }
+    }
   };
 
   // -----------------------------------------------------
-  // [วางโค้ดใหม่ตรงนี้ครับ] แทรกต่อจาก handleStartGame เลย
-  // -----------------------------------------------------
+  // [แก้ไข] ปรับปรุงฟังก์ชันล้างเกม ให้รีโหลดหน้าเว็บจริง
   const handleTeacherReset = () => {
     const code = window.prompt("ใส่รหัสลับเพื่อล้างเกม (สำหรับครู):");
+    
     if (code === '9999') { 
-        // 1. บันทึกคะแนนปัจจุบันก่อน
+        // 1. บันทึกคะแนนปัจจุบันส่งท้าย (ถ้าต้องการ)
         onGameEnd(totalDistance, currentScore);
         
-        // 2. ล้างเซฟทิ้ง
+        // 2. ล้างเซฟในเครื่องทิ้ง
         StorageService.clearGameState();
         
-        // 3. ออกจากเกม
-        onExit();
+        // 3. แจ้งเตือนและรีโหลดหน้าเว็บทันที! (สำคัญมาก เพื่อเคลียร์ค่าค้างใน RAM)
+        alert("✅ ล้างเกมเรียบร้อย! ระบบจะรีเซ็ตตัวเอง...");
+        window.location.reload();
+
+    } else if (code !== null) {
+        // เพิ่ม: แจ้งเตือนถ้าใส่รหัสผิด
+        alert("❌ รหัสไม่ถูกต้องครับ!");
     }
-};
+  };
 
   // [แก้บรรทัดนี้] เพิ่ม (targetIdx?: number) เพื่อรับลำดับที่จะเปิด
   const showQuestion = (targetIdx?: number) => {
