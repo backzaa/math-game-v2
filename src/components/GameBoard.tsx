@@ -115,6 +115,8 @@ export const GameBoard: React.FC<Props> = ({
   const [activeQuestion, setActiveQuestion] = useState<MathQuestion | null>(null);
   const [isMoving, setIsMoving] = useState(false);
   const [pendingSteps, setPendingSteps] = useState(0);
+  // [เพิ่มใหม่] รายการช่องที่เคลียร์โจทย์แล้ว (จะไม่ถามซ้ำ)
+  const [clearedTiles, setClearedTiles] = useState<number[]>(savedData?.clearedTiles || []);
   const [gameFinished, setGameFinished] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState<{type: 'WIN'|'TREASURE'|'TRAP', msg: string} | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -288,9 +290,34 @@ export const GameBoard: React.FC<Props> = ({
             tiles: tiles // [สำคัญมาก] ต้องบันทึกกระดานไปด้วย
         });
     }
-  }, [localPlayers, localCurrentIndex, currentQuestionIndex, tiles, gameFinished, gameMode]);
+  }, [localPlayers, localCurrentIndex, currentQuestionIndex, tiles, gameFinished, gameMode, pendingSteps, clearedTiles]);
   useEffect(() => { playersRef.current = localPlayers; }, [localPlayers]);
-  
+  // [แก้ไขจุดที่ 3] Logic ตอนโหลดเกมกลับมา (Resume) + เช็ค Cleared Tiles
+  useEffect(() => {
+    if (savedData && tiles.length > 0 && !gameFinished) {
+        
+        const currentPos = localPlayers[localCurrentIndex].position;
+        const currentTile = tiles[currentPos];
+
+        // เช็คว่ายืนบนโจทย์ไหม? และโจทย์นี้เคยทำไปหรือยัง?
+        const isQuestionTile = currentTile?.type === 'QUESTION';
+        const isCleared = clearedTiles.includes(currentPos);
+
+        // กรณี 1: ยืนบนช่องโจทย์ และ "ยังไม่เคลียร์" -> เปิดโจทย์ทันที (หนีไม่ได้)
+        if (isQuestionTile && !isCleared && !activeQuestion) {
+            const qIdx = savedData.currentQuestionIndex ?? 0;
+            const q = questions[qIdx % questions.length];
+            setActiveQuestion(q);
+        }
+        // กรณี 2: มีก้าวเหลือ (pendingSteps > 0) -> เดินต่อเอง!
+        // (ครอบคลุมทั้งกรณีไม่ใช่โจทย์ หรือเป็นโจทย์ที่เคลียร์ไปแล้ว)
+        else if (pendingSteps > 0 && !isMoving && !activeQuestion) {
+            setTimeout(() => {
+                resumeMove();
+            }, 1000); 
+        }
+    }
+}, [tiles]); // ทำงานครั้งเดียวตอนโหลดกระดานเสร็จ
   const playSfx = (url: string) => { 
       const audio = new Audio(url); 
       audio.volume = sfxVolume; 
@@ -316,7 +343,13 @@ export const GameBoard: React.FC<Props> = ({
       }, 1500);
   };
   const startMove = (steps: number) => moveOneStep(steps, playersRef.current[localCurrentIndex].position);
-  const moveOneStep = (stepsRemaining: number, currentPos: number) => { if (stepsRemaining <= 0) { setIsMoving(false); const tile = tiles[currentPos]; if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); else if (tile?.type === 'QUESTION' && pendingSteps === 0) handleTileEvent('QUESTION'); else endTurn(); return; } setIsMoving(true); playSfx(SFX.STEP); const nextPos = Math.min(currentPos + 1, tiles.length - 1); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; setLocalPlayers(newPlayers); onTurnComplete(newPlayers, localCurrentIndex); setTimeout(() => { const tile = tiles[nextPos]; if (tile?.type === 'FINISH') { setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; } if (tile?.type === 'QUESTION') { setIsMoving(false); setPendingSteps(stepsRemaining - 1); handleTileEvent('QUESTION'); return; } if (tile?.type === 'TRAP' && stepsRemaining === 1) { setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; } moveOneStep(stepsRemaining - 1, nextPos); }, 500); };
+  const moveOneStep = (stepsRemaining: number, currentPos: number) => { if (stepsRemaining <= 0) { setIsMoving(false); const tile = tiles[currentPos]; if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); else if (tile?.type === 'QUESTION' && pendingSteps === 0) handleTileEvent('QUESTION'); else endTurn(); return; } setIsMoving(true); playSfx(SFX.STEP); const nextPos = Math.min(currentPos + 1, tiles.length - 1); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; setLocalPlayers(newPlayers); onTurnComplete(newPlayers, localCurrentIndex); setTimeout(() => { const tile = tiles[nextPos]; if (tile?.type === 'FINISH') { setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; } // [แก้ไข] ถ้าเป็นช่องโจทย์ และ "ยังไม่อยู่ในรายการที่เคลียร์" -> หยุดทำโจทย์
+          if (tile?.type === 'QUESTION' && !clearedTiles.includes(nextPos)) { 
+              setIsMoving(false); 
+              setPendingSteps(stepsRemaining - 1); 
+              handleTileEvent('QUESTION'); 
+              return; 
+          } { setIsMoving(false); setPendingSteps(stepsRemaining - 1); handleTileEvent('QUESTION'); return; } if (tile?.type === 'TRAP' && stepsRemaining === 1) { setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; } moveOneStep(stepsRemaining - 1, nextPos); }, 500); };
   
   const handleTileEvent = (type: TileType) => { 
     if (type === 'QUESTION') {
@@ -380,19 +413,34 @@ export const GameBoard: React.FC<Props> = ({
       }, 800); 
   };
   
+  // [แก้ไข] ตอบปุ๊บ บันทึกว่าเคลียร์ แล้วเดินต่อเลย
   const handleAnswer = (correct: boolean, usedCalculator: boolean) => { 
-      if (activeQuestion) { 
-          const fullScore = GAME_CONFIG.pointsPerQuestion;
-          const score = correct ? (usedCalculator ? fullScore / 2 : fullScore) : 0; 
-          onQuestionAnswered({ questionText: activeQuestion.question, isCorrect: correct, scoreEarned: score }); 
-          if (correct) { 
-              const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex].score += score; 
-              if (usedCalculator && newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; }
-              setLocalPlayers(newPlayers); 
-          } 
-      } 
-      resumeMove(); 
-  };
+    // 1. บันทึกว่าช่องปัจจุบัน (currentPos) ถูกเคลียร์แล้ว
+    const currentPos = localPlayers[localCurrentIndex].position;
+    setClearedTiles(prev => [...prev, currentPos]);
+
+    // 2. คำนวณคะแนน
+    if (activeQuestion) { 
+        const fullScore = GAME_CONFIG.pointsPerQuestion;
+        const score = correct ? (usedCalculator ? fullScore / 2 : fullScore) : 0; 
+        onQuestionAnswered({ questionText: activeQuestion.question, isCorrect: correct, scoreEarned: score }); 
+        
+        if (correct) { 
+            const newPlayers = [...playersRef.current]; 
+            newPlayers[localCurrentIndex].score += score; 
+            if (usedCalculator && newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { 
+                newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; 
+            }
+            setLocalPlayers(newPlayers); 
+        } 
+        // เปลี่ยนข้อรอไว้เลย
+        setCurrentQuestionIndex(prev => prev + 1);
+    } 
+    
+    // 3. ปิดโจทย์ และ เดินต่อทันที!
+    setActiveQuestion(null);
+    resumeMove(); 
+};
   
   const handleConsumeCalculator = () => { const newPlayers = [...playersRef.current]; if (newPlayers[localCurrentIndex].calculatorUsesLeft > 0) { newPlayers[localCurrentIndex].calculatorUsesLeft -= 1; setLocalPlayers(newPlayers); } };
   // [Step 3] ฟังก์ชันล้างเกม (วางต่อจาก handleConsumeCalculator)
