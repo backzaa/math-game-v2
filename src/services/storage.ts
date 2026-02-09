@@ -305,5 +305,43 @@ checkLocalPlayedToday: (studentId: string): boolean => {
 
   getFreeplayPool: () => { const d = localStorage.getItem(FREEPLAY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; },
   
-  getFreeplayQuestions: () => { const d = localStorage.getItem(FREEPLAY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; }
+  getFreeplayQuestions: () => { const d = localStorage.getItem(FREEPLAY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; },
+
+ // ... (วางต่อจาก getFreeplayQuestions)
+
+  // [เพิ่มใหม่] บันทึกสถานะเกม (Auto-Save)
+  saveGameState: (data: any) => {
+    const payload = {
+        date: new Date().toISOString().split('T')[0], // แปะวันที่ไว้เช็คข้ามวัน
+        data: data
+    };
+    localStorage.setItem('math_game_autosave', JSON.stringify(payload));
+},
+
+// [เพิ่มใหม่] โหลดสถานะเกม (Auto-Resume)
+loadGameState: () => {
+    try {
+        const raw = localStorage.getItem('math_game_autosave');
+        if (!raw) return null;
+        
+        const parsed = JSON.parse(raw);
+        const today = new Date().toISOString().split('T')[0];
+
+        // เช็คว่าเซฟเป็นของวันนี้หรือเปล่า?
+        if (parsed.date !== today) {
+            // ถ้าเป็นของเมื่อวาน ให้ลบทิ้งเลย (เริ่มวันใหม่)
+            localStorage.removeItem('math_game_autosave');
+            return null;
+        }
+
+        return parsed.data;
+    } catch (e) {
+        return null;
+    }
+},
+
+// [เพิ่มใหม่] ลบเซฟเมื่อจบเกม หรือครูสั่งล้าง
+clearGameState: () => {
+    localStorage.removeItem('math_game_autosave');
+} 
 };

@@ -110,6 +110,35 @@ export function App() {
             if (config.menuPlaylist) setMenuPlaylist(config.menuPlaylist);
         }
 
+        // [เพิ่มใหม่ Step 1] เช็คว่ามีเกมค้างไว้หรือไม่ (Auto-Resume)
+        const savedState = StorageService.loadGameState();
+        
+        if (savedState) {
+            setLoadStatus('พบเกมที่เล่นค้างไว้! กำลังกู้คืน...');
+            
+            // กู้คืนค่า State ทั้งหมดกลับมา
+            setCurrentStudentId(savedState.studentId);
+            setGuestName(savedState.guestName || '');
+            setGameType(savedState.gameType);
+            setGameMode(savedState.mode);
+            setSelectedTheme(savedState.theme);
+            setActiveGameQuestions(savedState.questions || []);
+            setGamePlayers(savedState.players || []);
+            setSessionDetails(savedState.sessionDetails || []);
+
+            // จบการโหลด แล้วกระโดดไปหน้า GAME ทันที
+            clearInterval(timer);
+            setLoadProgress(100);
+            isDataLoaded.current = true;
+
+            setTimeout(() => {
+                setScreen('GAME');
+            }, 1000);
+            
+            return; // หยุดการทำงาน ไม่ต้องไปหน้า Login
+        }
+
+        // ถ้าไม่มีเซฟค้าง ก็ไปหน้า Login ตามปกติ
         clearInterval(timer);
         setLoadStatus('ข้อมูลพร้อมแล้ว! กำลังเข้าสู่ระบบ...');
         setLoadProgress(100);

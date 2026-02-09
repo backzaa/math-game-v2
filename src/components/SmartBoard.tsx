@@ -147,6 +147,25 @@ export const SmartBoard: React.FC<Props> = ({
     if (audioRef.current) audioRef.current.volume = bgmVolume;
   }, [bgmVolume]);
 
+  // ... (หลัง useEffect ของ Audio)
+
+  // [เพิ่มใหม่ Step 2] Auto-Save ทุกครั้งที่ค่าสำคัญเปลี่ยน
+  useEffect(() => {
+    // บันทึกเฉพาะตอนเล่นเกมอยู่ (ไม่ใช่ตอนจบ หรือตอนเริ่ม)
+    if (gameState !== 'READY' && gameState !== 'FINISHED' && mode === 'CLASSROOM') {
+        StorageService.saveGameState({
+            studentId: player.id,
+            guestName: player.firstName, // หรือ nickname
+            gameType: 'RALLY',
+            mode: mode,
+            theme: theme,
+            questions: questions,
+            players: [player], // บันทึก Player ปัจจุบันที่มีคะแนนล่าสุด
+            sessionDetails: [] // จริงๆ ควรส่ง sessionDetails มาด้วย แต่เอาแค่นี้ก่อนเพื่อ Resume
+        });
+    }
+  }, [totalDistance, currentScore, currentQuestionIdx, gameState]);
+
   useEffect(() => {
     if (audioRef.current && activePlaylist.length > 0) {
         const rawLink = activePlaylist[currentSongIndex];
@@ -220,6 +239,23 @@ export const SmartBoard: React.FC<Props> = ({
           }
       }
   };
+
+  // -----------------------------------------------------
+  // [วางโค้ดใหม่ตรงนี้ครับ] แทรกต่อจาก handleStartGame เลย
+  // -----------------------------------------------------
+  const handleTeacherReset = () => {
+    const code = window.prompt("ใส่รหัสลับเพื่อล้างเกม (สำหรับครู):");
+    if (code === '9999') { 
+        // 1. บันทึกคะแนนปัจจุบันก่อน
+        onGameEnd(totalDistance, currentScore);
+        
+        // 2. ล้างเซฟทิ้ง
+        StorageService.clearGameState();
+        
+        // 3. ออกจากเกม
+        onExit();
+    }
+};
 
   // [แก้บรรทัดนี้] เพิ่ม (targetIdx?: number) เพื่อรับลำดับที่จะเปิด
   const showQuestion = (targetIdx?: number) => {
@@ -485,6 +521,18 @@ export const SmartBoard: React.FC<Props> = ({
                               />
                           </div>
                       </div>
+
+                      {/* [ส่วนที่เพิ่มใหม่] ปุ่มล้างเกม (เฉพาะโหมดห้องเรียน) */}
+                      {mode === 'CLASSROOM' && (
+                          <div className="mt-4 pt-3 border-t border-slate-700">
+                              <button 
+                                  onClick={handleTeacherReset}
+                                  className="w-full bg-red-900/50 hover:bg-red-700 text-red-200 text-xs py-2 rounded-lg border border-red-800 transition-colors font-bold"
+                              >
+                                  ⚠️ ล้างเกม (ครู)
+                              </button>
+                          </div>
+                      )}
                   </div>
               )}
           </div>
