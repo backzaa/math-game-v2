@@ -343,13 +343,50 @@ export const GameBoard: React.FC<Props> = ({
       }, 1500);
   };
   const startMove = (steps: number) => moveOneStep(steps, playersRef.current[localCurrentIndex].position);
-  const moveOneStep = (stepsRemaining: number, currentPos: number) => { if (stepsRemaining <= 0) { setIsMoving(false); const tile = tiles[currentPos]; if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); else if (tile?.type === 'QUESTION' && pendingSteps === 0) handleTileEvent('QUESTION'); else endTurn(); return; } setIsMoving(true); playSfx(SFX.STEP); const nextPos = Math.min(currentPos + 1, tiles.length - 1); const newPlayers = [...playersRef.current]; newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; setLocalPlayers(newPlayers); onTurnComplete(newPlayers, localCurrentIndex); setTimeout(() => { const tile = tiles[nextPos]; if (tile?.type === 'FINISH') { setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; } // [แก้ไข] ถ้าเป็นช่องโจทย์ และ "ยังไม่อยู่ในรายการที่เคลียร์" -> หยุดทำโจทย์
-          if (tile?.type === 'QUESTION' && !clearedTiles.includes(nextPos)) { 
-              setIsMoving(false); 
-              setPendingSteps(stepsRemaining - 1); 
-              handleTileEvent('QUESTION'); 
-              return; 
-          } { setIsMoving(false); setPendingSteps(stepsRemaining - 1); handleTileEvent('QUESTION'); return; } if (tile?.type === 'TRAP' && stepsRemaining === 1) { setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; } moveOneStep(stepsRemaining - 1, nextPos); }, 500); };
+  const moveOneStep = (stepsRemaining: number, currentPos: number) => { 
+    if (stepsRemaining <= 0) { 
+        setIsMoving(false); 
+        const tile = tiles[currentPos]; 
+        // หมดก้าวแล้ว ตกช่องไหนทำงานช่องนั้น
+        if (tile?.type === 'TREASURE') handleTileEvent('TREASURE'); 
+        else if (tile?.type === 'QUESTION' && !clearedTiles.includes(currentPos)) handleTileEvent('QUESTION'); // เช็ค cleared ตรงนี้ด้วยเผื่อจบที่ช่องโจทย์
+        else endTurn(); 
+        return; 
+    } 
+    
+    setIsMoving(true); 
+    playSfx(SFX.STEP); 
+    const nextPos = Math.min(currentPos + 1, tiles.length - 1); 
+    const newPlayers = [...playersRef.current]; 
+    newPlayers[localCurrentIndex] = { ...newPlayers[localCurrentIndex], position: nextPos }; 
+    setLocalPlayers(newPlayers); 
+    onTurnComplete(newPlayers, localCurrentIndex); 
+    
+    setTimeout(() => { 
+        const tile = tiles[nextPos]; 
+        
+        // 1. ถ้าเข้าเส้นชัย
+        if (tile?.type === 'FINISH') { 
+            setIsMoving(false); setGameFinished(true); confetti(); playSfx(SFX.WIN); return; 
+        } 
+        
+        // 2. ถ้าเจอโจทย์ และ ยังไม่เคยตอบ (Cleared) -> หยุดเดิน
+        if (tile?.type === 'QUESTION' && !clearedTiles.includes(nextPos)) { 
+            setIsMoving(false); 
+            setPendingSteps(stepsRemaining - 1); // เก็บทดก้าวที่เหลือไว้
+            handleTileEvent('QUESTION'); 
+            return; 
+        } 
+        
+        // 3. ถ้าเจอกับดัก (และเป็นก้าวสุดท้าย)
+        if (tile?.type === 'TRAP' && stepsRemaining === 1) { 
+            setIsMoving(false); setPendingSteps(0); handleTileEvent('TRAP'); return; 
+        } 
+        
+        // 4. ถ้าไม่มีอะไรขัดจังหวะ ก็เดินต่อ
+        moveOneStep(stepsRemaining - 1, nextPos); 
+    }, 500); 
+};
   
   const handleTileEvent = (type: TileType) => { 
     if (type === 'QUESTION') {
