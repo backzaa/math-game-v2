@@ -3,7 +3,8 @@ import type { PlayerState, TileType, MathQuestion, ThemeConfig, TileConfig, Ques
 import { StorageService } from '../services/storage'; 
 import { CharacterSvg } from './CharacterSvg';
 import { MathModal } from './MathModal';
-import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, PlayCircle, Dices, Footprints } from 'lucide-react';
+// [แก้ไข] เพิ่ม Clock
+import { Trophy, LogOut, Settings, Home, Music, SkipForward, Play, Pause, PlayCircle, Dices, Footprints, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
   onTurnComplete: (newPlayers: PlayerState[], nextIndex: number) => void;
   onQuestionAnswered: (detail: QuestionDetail) => void;
   // [แก้ไข] รับค่า distance และ score เพื่อส่งกลับไปบันทึก
-  onGameEnd: (distance: number, score: number) => void;
+  onGameEnd: (distance: number, score: number, duration: number) => void;
   onExit: () => void;
 }
 
@@ -120,6 +121,27 @@ export const GameBoard: React.FC<Props> = ({
   const [clearedTiles, setClearedTiles] = useState<number[]>(savedData?.clearedTiles || []);
   const [gameFinished, setGameFinished] = useState(false);
   const [activeOverlay, setActiveOverlay] = useState<{type: 'WIN'|'TREASURE'|'TRAP', msg: string} | null>(null);
+  // [เพิ่มใหม่ 1] State เวลา และ Logic การเดินเวลา
+  const [elapsedTime, setElapsedTime] = useState<number>(savedData?.elapsedTime ?? 0);
+
+  useEffect(() => {
+      let timer: any;
+      if (!gameFinished && !activeQuestion && !activeOverlay) {
+          // เดินเวลาเมื่อเกมยังไม่จบ (และอาจจะหยุดตอนตอบคำถาม ถ้าต้องการ หรือปล่อยไหลก็ได้)
+          // ในที่นี้ขอปล่อยไหลตลอด เพื่อกดดันนิดๆ ยกเว้นจบเกม
+          timer = setInterval(() => {
+              setElapsedTime(prev => prev + 1);
+          }, 1000);
+      }
+      return () => clearInterval(timer);
+  }, [gameFinished]); // จับเวลาตลอดจนกว่าจะจบเกม
+
+  // ฟังก์ชันแปลงเวลาเป็น MM:SS
+  const formatTime = (seconds: number) => {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+  };
   const [isSpinning, setIsSpinning] = useState(false);
   const [displayNumber, setDisplayNumber] = useState(1);
   const [trapBackSteps, setTrapBackSteps] = useState(0);
@@ -272,6 +294,7 @@ export const GameBoard: React.FC<Props> = ({
   }, []);
   
   // [แก้ไขจุดที่ 2] Auto-Save แบบครบถ้วน
+  // [แก้ไขจุดที่ 2] Auto-Save แบบละเอียด (บันทึกทุกสถานะ)
   useEffect(() => {
     if (!gameFinished && gameMode === 'CLASSROOM') {
         StorageService.saveGameState({
@@ -288,37 +311,56 @@ export const GameBoard: React.FC<Props> = ({
             players: localPlayers,
             currentPlayerIndex: localCurrentIndex,
             currentQuestionIndex: currentQuestionIndex,
-            tiles: tiles // [สำคัญมาก] ต้องบันทึกกระดานไปด้วย
+            tiles: tiles,
+            
+            // [เพิ่ม] State สำคัญสำหรับ Anti-Cheat
+            elapsedTime: elapsedTime,       // เวลาปัจจุบัน
+            activeQuestion: activeQuestion, // โจทย์ที่ค้างอยู่
+            activeOverlay: activeOverlay,   // popup ที่ค้างอยู่ (กับดัก/สมบัติ)
+            pendingSteps: pendingSteps,     // ก้าวที่ยังเดินไม่ครบ
+            clearedTiles: clearedTiles      // ช่องที่ตอบไปแล้ว
         });
     }
-  }, [localPlayers, localCurrentIndex, currentQuestionIndex, tiles, gameFinished, gameMode, pendingSteps, clearedTiles]);
+  }, [localPlayers, localCurrentIndex, currentQuestionIndex, tiles, gameFinished, gameMode, pendingSteps, clearedTiles, activeQuestion, activeOverlay, elapsedTime]); // เพิ่ม dependencies ให้ครบ
+
   useEffect(() => { playersRef.current = localPlayers; }, [localPlayers]);
   // [แก้ไขจุดที่ 3] Logic ตอนโหลดเกมกลับมา (Resume) + เช็ค Cleared Tiles
+  // [แก้ไขจุดที่ 3] Logic Resume: โหลดกลับมาให้เป๊ะทุกจุด
   useEffect(() => {
     if (savedData && tiles.length > 0 && !gameFinished) {
         
-        const currentPos = localPlayers[localCurrentIndex].position;
-        const currentTile = tiles[currentPos];
-
-        // เช็คว่ายืนบนโจทย์ไหม? และโจทย์นี้เคยทำไปหรือยัง?
-        const isQuestionTile = currentTile?.type === 'QUESTION';
-        const isCleared = clearedTiles.includes(currentPos);
-
-        // กรณี 1: ยืนบนช่องโจทย์ และ "ยังไม่เคลียร์" -> เปิดโจทย์ทันที (หนีไม่ได้)
-        if (isQuestionTile && !isCleared && !activeQuestion) {
-            const qIdx = savedData.currentQuestionIndex ?? 0;
-            const q = questions[qIdx % questions.length];
-            setActiveQuestion(q);
+        // 1. ถ้ามี Overlay ค้างอยู่ (เช่น กับดัก) ให้เด้งขึ้นมาเลย
+        if (savedData.activeOverlay) {
+            setActiveOverlay(savedData.activeOverlay);
         }
-        // กรณี 2: มีก้าวเหลือ (pendingSteps > 0) -> เดินต่อเอง!
-        // (ครอบคลุมทั้งกรณีไม่ใช่โจทย์ หรือเป็นโจทย์ที่เคลียร์ไปแล้ว)
-        else if (pendingSteps > 0 && !isMoving && !activeQuestion) {
-            setTimeout(() => {
-                resumeMove();
-            }, 1000); 
+
+        // 2. ถ้ามีโจทย์ค้างอยู่ ให้เด้งขึ้นมาเลย (หนีไม่ได้)
+        if (savedData.activeQuestion) {
+            setActiveQuestion(savedData.activeQuestion);
+        } 
+        // 3. ถ้าไม่มีโจทย์ค้าง แต่ยืนบนช่องโจทย์ที่ยังไม่เคลียร์
+        else {
+            const currentPos = localPlayers[localCurrentIndex].position;
+            const currentTile = tiles[currentPos];
+            const isQuestionTile = currentTile?.type === 'QUESTION';
+            const isCleared = clearedTiles.includes(currentPos);
+
+            if (isQuestionTile && !isCleared) {
+                // เปิดโจทย์เดิม (หรือข้อถัดไปตามคิว)
+                const qIdx = savedData.currentQuestionIndex ?? 0;
+                const q = questions[qIdx % questions.length];
+                setActiveQuestion(q);
+            }
+            // 4. ถ้ามีก้าวเหลือ ให้เดินต่อ
+            else if (pendingSteps > 0 && !isMoving) {
+                setTimeout(() => {
+                    resumeMove();
+                }, 1000); 
+            }
         }
     }
-}, [tiles]); // ทำงานครั้งเดียวตอนโหลดกระดานเสร็จ
+  }, [tiles]);
+// ทำงานครั้งเดียวตอนโหลดกระดานเสร็จ
   const playSfx = (url: string) => { 
       const audio = new Audio(url); 
       audio.volume = sfxVolume; 
@@ -485,7 +527,7 @@ export const GameBoard: React.FC<Props> = ({
   const handleTeacherReset = () => {
     const code = window.prompt("ใส่รหัสลับเพื่อล้างเกม (สำหรับครู):");
     if (code === '9999') {
-        onGameEnd(0, currentPlayer?.score || 0); // บันทึกคะแนนเท่าที่มี
+        onGameEnd(0, currentPlayer?.score || 0, elapsedTime); // [เพิ่ม] elapsedTime
         StorageService.clearGameState(); // ล้างเซฟ
         
         // ล้าง LocalStorage เก่าด้วย
@@ -627,7 +669,10 @@ export const GameBoard: React.FC<Props> = ({
           </div>
       </div>
 
+      {/* --- ส่วนแสดงผล Profile, คะแนน, เวลา และ ปุ่มทอยเต๋า (Bottom/Right Panel) --- */}
       <div className="relative w-full h-[20%] md:w-[20%] md:h-full z-20 order-2 md:order-2 bg-slate-900/95 border-t-4 md:border-t-0 md:border-l-4 border-slate-700 backdrop-blur-md flex flex-row md:flex-col items-center justify-between p-3 md:p-6 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+           
+           {/* ส่วนซ้าย (หรือบน): รูปโปรไฟล์ + ชื่อ + คะแนน + เวลา */}
            <div className="flex flex-row md:flex-col items-center gap-3 w-[50%] md:w-full">
                <div className="relative w-14 h-14 md:w-32 md:h-32 hover:scale-110 transition-transform">
                    <div className="absolute inset-0 bg-white/10 rounded-full blur-xl animate-pulse"></div>
@@ -637,50 +682,78 @@ export const GameBoard: React.FC<Props> = ({
                        <CharacterSvg appearance={currentPlayer?.appearance} theme={currentThemeKey} className="w-full h-full drop-shadow-2xl relative z-10" />
                    )}
                </div>
-               <div className="text-left md:text-center overflow-hidden min-w-0"><h1 className="text-sm md:text-2xl font-black text-white truncate">{currentPlayer?.nickname || currentPlayer?.firstName}</h1><div className="hidden md:block bg-slate-800/80 w-full p-3 rounded-xl border border-slate-600 mt-3"><div className="text-xs text-slate-400 uppercase">คะแนนสะสม</div><div className="text-5xl font-black text-yellow-400">{currentPlayer?.score}</div></div><div className="md:hidden text-yellow-400 font-black text-sm">⭐ {currentPlayer?.score} คะแนน</div></div>
-           </div>
-           
-           <div className="w-[50%] md:w-full flex justify-end md:justify-center pl-2">
-                <div className="bg-slate-800/40 p-3 rounded-2xl border-2 border-slate-600/50 shadow-xl backdrop-blur-sm flex flex-row md:flex-col items-center gap-4">
+               
+               <div className="text-left md:text-center overflow-hidden min-w-0 w-full">
+                    <h1 className="text-sm md:text-2xl font-black text-white truncate mb-1 md:mb-4">{currentPlayer?.nickname || currentPlayer?.firstName}</h1>
                     
-                    <div className="bg-slate-900 w-16 h-12 md:w-full md:h-24 rounded-xl flex items-center justify-center border-2 border-slate-600 relative shadow-inner">
-                        <span className={`text-3xl md:text-6xl font-black font-mono ${isSpinning ? 'text-white/50 blur-[1px]' : 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]'}`}>
-                            {displayNumber}
-                        </span>
+                    {/* Desktop Layout: คะแนน + เวลา */}
+                    <div className="hidden md:block w-full space-y-2">
+                        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-600">
+                            <div className="text-xs text-slate-400 uppercase">คะแนนสะสม</div>
+                            <div className="text-4xl lg:text-5xl font-black text-yellow-400">{currentPlayer?.score}</div>
+                        </div>
+                        <div className="bg-slate-800/80 p-2 rounded-xl border border-slate-600 flex justify-between items-center">
+                            <span className="text-xs text-slate-400 flex items-center gap-1"><Clock size={14}/> เวลา</span>
+                            <span className="text-lg font-bold text-blue-300 font-mono">{formatTime(elapsedTime)}</span>
+                        </div>
                     </div>
 
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); handleAction(); }} 
-                        disabled={isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null}
-                        className={`
-                            relative group transition-all duration-100 ease-in-out
-                            w-20 h-20 md:w-24 md:h-24 rounded-full 
-                            flex items-center justify-center shrink-0
-                            border-b-[6px] active:border-b-0 active:translate-y-[6px] active:shadow-none
-                            shadow-xl hover:scale-105
-                            ${(isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) 
-                                ? 'bg-gradient-to-b from-red-500 to-red-600 border-red-800' 
-                                : 'bg-gradient-to-b from-blue-400 to-blue-600 border-blue-800' 
-                            }
-                        `}
-                    >
-                        <div className="drop-shadow-md text-white">
-                            {isSpinning ? (
-                                <Dices className="animate-spin" size={32} /> 
-                            ) : (isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) ? (
-                                <Footprints className="animate-bounce" size={32} /> 
-                            ) : (
-                                <span className="font-black text-2xl">สุ่ม</span> 
-                            )}
+                    {/* Mobile Layout: คะแนน + เวลา (แนวนอน) */}
+                    <div className="md:hidden flex flex-wrap gap-2">
+                        <div className="bg-slate-800/60 px-2 py-1 rounded-lg border border-yellow-500/30 flex items-center gap-1">
+                            <Trophy size={12} className="text-yellow-400 fill-yellow-400"/>
+                            <span className="text-xs font-bold text-yellow-100">{currentPlayer?.score}</span>
                         </div>
-                        
-                        {pendingSteps > 0 && (
-                            <div className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 border-2 border-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center animate-bounce shadow-md z-10">
-                                {pendingSteps}
-                            </div>
-                        )}
-                    </button>
+                        <div className="bg-slate-800/60 px-2 py-1 rounded-lg border border-blue-500/30 flex items-center gap-1">
+                            <Clock size={12} className="text-blue-400"/>
+                            <span className="text-xs font-bold text-blue-100 font-mono">{formatTime(elapsedTime)}</span>
+                        </div>
+                    </div>
                 </div>
+           </div>
+           
+           {/* ส่วนขวา (หรือล่าง): ปุ่มทอยเต๋า */}
+           <div className="w-[50%] md:w-full flex justify-end md:justify-center pl-2">
+               <div className="bg-slate-800/40 p-3 rounded-2xl border-2 border-slate-600/50 shadow-xl backdrop-blur-sm flex flex-row md:flex-col items-center gap-4">
+                   
+                   <div className="bg-slate-900 w-16 h-12 md:w-full md:h-24 rounded-xl flex items-center justify-center border-2 border-slate-600 relative shadow-inner">
+                       <span className={`text-3xl md:text-6xl font-black font-mono ${isSpinning ? 'text-white/50 blur-[1px]' : 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]'}`}>
+                           {displayNumber}
+                       </span>
+                   </div>
+
+                   <button 
+                       onClick={(e) => { e.stopPropagation(); handleAction(); }} 
+                       disabled={isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null}
+                       className={`
+                           relative group transition-all duration-100 ease-in-out
+                           w-20 h-20 md:w-24 md:h-24 rounded-full 
+                           flex items-center justify-center shrink-0
+                           border-b-[6px] active:border-b-0 active:translate-y-[6px] active:shadow-none
+                           shadow-xl hover:scale-105
+                           ${(isSpinning || isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) 
+                               ? 'bg-gradient-to-b from-red-500 to-red-600 border-red-800' 
+                               : 'bg-gradient-to-b from-blue-400 to-blue-600 border-blue-800' 
+                           }
+                       `}
+                   >
+                       <div className="drop-shadow-md text-white">
+                           {isSpinning ? (
+                               <Dices className="animate-spin" size={32} /> 
+                           ) : (isMoving || pendingSteps > 0 || isFinishingTurn || activeQuestion !== null || activeOverlay !== null) ? (
+                               <Footprints className="animate-bounce" size={32} /> 
+                           ) : (
+                               <span className="font-black text-2xl">สุ่ม</span> 
+                           )}
+                       </div>
+                       
+                       {pendingSteps > 0 && (
+                           <div className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 border-2 border-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center animate-bounce shadow-md z-10">
+                               {pendingSteps}
+                           </div>
+                       )}
+                   </button>
+               </div>
            </div>
       </div>
 
@@ -702,7 +775,7 @@ export const GameBoard: React.FC<Props> = ({
                     onClick={() => { 
                         localStorage.removeItem('math_game_session_players'); 
                         localStorage.removeItem('math_game_session_index');
-                        onGameEnd(0, currentPlayer?.score || 0); 
+                        onGameEnd(0, currentPlayer?.score || 0, elapsedTime); // [เพิ่ม] elapsedTime 
                     }} 
                     className="bg-green-600 w-full py-3 rounded-xl text-lg font-bold text-white shadow-lg transition flex items-center justify-center gap-2"
                 >
