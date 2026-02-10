@@ -46,21 +46,22 @@ const VideoLayer = ({
 }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const isActive = activeState === stateKey;
-    const shouldLoop = stateKey === 'RUN';
+    const shouldLoop = stateKey === 'RUN'; 
 
     useEffect(() => {
-        if (videoRef.current) {
+        const video = videoRef.current;
+        if (video) {
             if (isActive) {
-                videoRef.current.currentTime = 0;
-                const playPromise = videoRef.current.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => {});
-                }
+                // ถ้าเป็นตัวที่ต้องเล่น
+                if (!shouldLoop) video.currentTime = 0;
+                // สั่งเล่น พร้อมดัก Error (กัน iOS บ่น)
+                video.play().catch(() => {});
             } else {
-                videoRef.current.pause(); 
+                // ถ้าไม่ใช่ตัวที่เล่น ให้หยุดทันที (ประหยัด RAM)
+                video.pause();
             }
         }
-    }, [isActive]);
+    }, [isActive, shouldLoop]);
 
     return (
         <video
@@ -69,12 +70,15 @@ const VideoLayer = ({
             loop={shouldLoop}
             muted
             playsInline
+            webkit-playsinline="true" // [สำคัญ] ต้องมีบรรทัดนี้สำหรับ Line/iOS
+            preload="auto"            // [สำคัญ] โหลดรอไว้เลย
             onEnded={() => {
                 if (isActive && !shouldLoop && onVideoEnd) {
                     onVideoEnd();
                 }
             }}
-            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity duration-500 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            // ใช้ Opacity ในการซ่อน/แสดง เพื่อความลื่นไหล
+            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity duration-200 ease-linear ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
         />
     );
 };
@@ -244,6 +248,13 @@ useEffect(() => {
 
   const handleStartGame = () => {
     setHasInteracted(true);
+    // [เพิ่ม] สร้าง Audio Object ตรงนี้แทน (ตอนที่นิ้วแตะจอจริงๆ)
+    if (!audioRef.current) {
+        audioRef.current = new Audio();
+        audioRef.current.volume = bgmVolume;
+        // เพิ่ม Event Listener ตรงนี้แทน
+        audioRef.current.addEventListener('ended', handleNextSong);
+    }
 
     // [แก้ไขจุดสำคัญ!] เช็คก่อนว่ามีเซฟเกมไหม? ถ้ามีห้ามรีเซ็ตค่า!
     if (savedData) {
