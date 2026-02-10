@@ -263,28 +263,32 @@ export const StorageService = {
   },
 
   addSession: async (id: string, sess: GameSession, studentName: string = '') => {
-      const realScore = sess.details ? sess.details.reduce((sum, d) => sum + (d.isCorrect ? d.scoreEarned : 0), 0) : 0;
-      // @ts-ignore
-      const isRally = sess.gameType === 'RALLY';
-      const bonusScore = isRally ? 0 : (sess.score - realScore);
+    const realScore = sess.details ? sess.details.reduce((sum, d) => sum + (d.isCorrect ? d.scoreEarned : 0), 0) : 0;
+    // @ts-ignore
+    const isRally = sess.gameType === 'RALLY';
+    const bonusScore = isRally ? 0 : (sess.score - realScore);
 
-      // @ts-ignore
-      const gType = sess.gameType || 'CLASSIC';
-      // @ts-ignore
-      const tDist = sess.totalDistance || 0;
+    // @ts-ignore
+    const gType = sess.gameType || 'CLASSIC';
+    // @ts-ignore
+    const tDist = sess.totalDistance || 0;
+    
+    // [แก้ไข] ดึงค่า duration จาก session มาเตรียมไว้ (ถ้าไม่มีให้เป็น 0)
+    const duration = sess.duration || 0; 
 
-      await StorageService.saveScore(
-          id, 
-          studentName, 
-          sess.score, 
-          realScore, 
-          bonusScore, 
-          sess.mode, 
-          sess.details || [],
-          gType,
-          tDist
-      );
-  },
+    await StorageService.saveScore(
+        id, 
+        studentName, 
+        sess.score, 
+        realScore, 
+        bonusScore, 
+        sess.mode, 
+        sess.details || [],
+        gType,
+        tDist,
+        duration // [แก้ไขสำคัญ] ✅ ส่งค่าเวลาตัวนี้เพิ่มเข้าไปครับ!
+    );
+},
 
   syncFromCloud: async () => {
     try {

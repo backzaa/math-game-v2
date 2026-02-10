@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
 import type { StudentProfile, MathQuestion, CharacterBase, SkinColor, Gender, ScoringMode, GameGlobalConfig } from '../types';
-import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, Clock, BarChart, AlertTriangle, Lock, Flag, Map } from 'lucide-react';
+import { LogOut, Trash2, UserPlus, Users, Palette, Star, Gamepad2, Save, Calendar, Edit3, PlusCircle, Music, Shuffle, HardDrive, ChevronRight, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, BarChart, AlertTriangle, Lock, Flag, Map } from 'lucide-react';
 
 interface Props {
   onLogout: () => void;
@@ -676,6 +676,12 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
    <span className="flex items-center gap-1.5"><Calendar size={16}/> {sess.date}</span>
    <span className="flex items-center gap-1.5"><Clock size={16}/> {new Date(sess.timestamp).toLocaleTimeString('th-TH')}</span>
+   {/* 👇 วางโค้ดใหม่ตรงนี้เลยครับ 👇 */}
+   {sess.duration !== undefined && (
+        <span className="flex items-center gap-1.5 text-blue-300 bg-blue-900/30 px-2 py-0.5 rounded border border-blue-500/30">
+            <Clock size={16} /> เล่นนาน: {Math.floor(sess.duration / 60)}:{(sess.duration % 60).toString().padStart(2, '0')}
+        </span>
+    )}
    
    {/* ... ส่วนป้ายกำกับโหมด RALLY/CLASSIC ... */}
                                      
@@ -739,14 +745,25 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                                {expandedSessions.has(sess.sessionId) && (
                                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/30 animate-pop-in">
                                       {sess.details?.map((d, dIdx) => (
-                                        <div key={dIdx} className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center shadow-inner">
-                                           <span className="text-base font-bold font-mono text-slate-200">{d.questionText}</span>
-                                           <div className="flex items-center gap-2">
-    {/* [เพิ่ม] แสดงชื่อคนเล่น (เฉพาะ ID 00) */}
-    
-                                           </div>
-                                        </div>
-                                      ))}
+    <div key={dIdx} className={`p-3 rounded-xl border flex justify-between items-center shadow-inner transition-colors ${d.isCorrect ? 'bg-green-900/20 border-green-500/30' : 'bg-red-900/20 border-red-500/30'}`}>
+        <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500 font-mono">#{dIdx + 1}</span>
+            <span className="text-base font-bold font-mono text-slate-200">{d.questionText}</span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+            {d.isCorrect ? (
+                <span className="text-green-400 flex items-center gap-1 text-sm font-bold bg-green-900/40 px-2 py-1 rounded-lg border border-green-500/20">
+                    <CheckCircle2 size={14} /> +{d.scoreEarned}
+                </span>
+            ) : (
+                <span className="text-red-400 flex items-center gap-1 text-sm font-bold bg-red-900/40 px-2 py-1 rounded-lg border border-red-500/20">
+                    <XCircle size={14} /> ผิด
+                </span>
+            )}
+        </div>
+    </div>
+))}
                                       {(!sess.details || sess.details.length === 0) && (
                                           <div className="col-span-2 text-center text-slate-500 italic py-2">ไม่มีข้อมูลรายละเอียดการตอบ</div>
                                       )}
