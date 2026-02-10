@@ -32,6 +32,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   // [เพิ่มใหม่] State สำหรับระบบแลกรางวัล
   const [rewardForm, setRewardForm] = useState({ name: '', points: '' });
   const [currentBalance, setCurrentBalance] = useState<any>(null); // เก็บ { totalScore, totalRedeemed, currentBalance }
+  // [เพิ่ม] State เก็บประวัติการแลก
+  const [redemptionHistory, setRedemptionHistory] = useState<any[]>([]);
   const [reportMode, setReportMode] = useState<ScoringMode>('CLASSROOM');
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
@@ -108,11 +110,18 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   // [แทรกตรงนี้] เพิ่ม Effect เพื่ออัปเดตยอดเงินเมื่อเลือกนักเรียน
   useEffect(() => {
     if (selectedStudent) {
-        // เรียกฟังก์ชันคำนวณเงินจาก StorageService ที่เราเพิ่งเขียน
         const balance = StorageService.getStudentBalance(selectedStudent.id);
         setCurrentBalance(balance);
+
+        // [เพิ่ม] ดึงประวัติการแลกของนักเรียนคนนี้
+        const allRedemptions = StorageService.getAllRedemptions();
+        const history = allRedemptions
+            .filter((r: any) => String(r.studentId) === String(selectedStudent.id))
+            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // เรียงจากล่าสุดไปเก่าสุด
+        setRedemptionHistory(history);
     } else {
         setCurrentBalance(null);
+        setRedemptionHistory([]); // เคลียร์ประวัติเมื่อไม่ได้เลือกนักเรียน
     }
 }, [selectedStudent, activeTab]); // ทำงานเมื่อเปลี่ยนคน หรือเปลี่ยน Tab (เช่น กลับมาจากหน้าอื่น)
 
@@ -334,9 +343,18 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
         if (success) {
             alert('แลกรางวัลสำเร็จ! 🎉');
             setRewardForm({ name: '', points: '' });
-            // อัปเดตยอดเงินทันที
+
+            // อัปเดตยอดเงิน
             const newBalance = StorageService.getStudentBalance(selectedStudent.id);
             setCurrentBalance(newBalance);
+
+            // [เพิ่ม] อัปเดตประวัติการแลกทันที
+            const allRedemptions = StorageService.getAllRedemptions();
+            const history = allRedemptions
+                .filter((r: any) => String(r.studentId) === String(selectedStudent.id))
+                .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            setRedemptionHistory(history);
+
         } else {
             alert('เกิดข้อผิดพลาดในการบันทึกครับ');
         }
@@ -765,78 +783,117 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                </div>
 
                {/* 2. คอลัมน์ขวา: พื้นที่แลกของ */}
-               <div className="md:col-span-2 bg-slate-900/50 rounded-xl border border-slate-700 p-6 h-[600px] flex flex-col items-center justify-center relative">
-                  {selectedStudent && currentBalance ? (
-                    <div className="w-full max-w-lg space-y-8 text-center animate-pop-in">
-                        
-                        {/* การ์ดแสดงยอดเงิน */}
-                        <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-[40px] border-4 border-yellow-500/50 shadow-2xl overflow-hidden group">
-                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500"></div>
-                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl animate-pulse"></div>
-                            
-                            <h2 className="text-2xl font-bold text-slate-300 mb-2">ยอดคะแนนคงเหลือของ</h2>
-                            <h1 className="text-4xl font-black text-white mb-6 drop-shadow-md">{selectedStudent.firstName} {selectedStudent.lastName}</h1>
-                            
-                            <div className="flex items-center justify-center gap-4 mb-4">
-                                <div className="text-right">
-                                    <div className="text-xs text-slate-400 uppercase tracking-widest">คะแนนสะสมรวม</div>
-                                    <div className="text-xl font-bold text-slate-300">{currentBalance.totalScore.toLocaleString()}</div>
-                                </div>
-                                <div className="h-10 w-[2px] bg-slate-600"></div>
-                                <div className="text-left">
-                                    <div className="text-xs text-slate-400 uppercase tracking-widest">ใช้ไปแล้ว</div>
-                                    <div className="text-xl font-bold text-red-400">-{currentBalance.totalRedeemed.toLocaleString()}</div>
-                                </div>
-                            </div>
+               <div className="md:col-span-2 bg-slate-900/50 rounded-xl border border-slate-700 p-6 h-[600px] flex flex-col relative overflow-hidden">
+    {selectedStudent && currentBalance ? (
+        <div className="w-full h-full flex flex-col gap-6 animate-pop-in overflow-y-auto pr-2 custom-scrollbar">
 
-                            <div className="bg-slate-950/50 rounded-2xl p-4 border border-yellow-500/30">
-                                <div className="text-sm font-bold text-yellow-500 uppercase tracking-[0.2em] mb-1">Current Balance</div>
-                                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-lg">
-                                    {currentBalance.currentBalance.toLocaleString()}
-                                </div>
-                            </div>
+            {/* ส่วนบน: แบ่งครึ่งซ้ายขวา (การ์ดคะแนน + ฟอร์มแลก) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 shrink-0">
+
+                {/* การ์ดแสดงยอดเงิน (Compact) */}
+                <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-3xl border-2 border-yellow-500/50 shadow-xl overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500"></div>
+                    <div className="flex justify-between items-start mb-2">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-400">ยอดคงเหลือของ</h2>
+                            <h1 className="text-xl font-black text-white truncate max-w-[150px]">{selectedStudent.firstName}</h1>
                         </div>
+                        <div className="text-right">
+                            <div className="text-xs text-slate-500 uppercase">Total Score</div>
+                            <div className="text-lg font-bold text-slate-300">{currentBalance.totalScore.toLocaleString()}</div>
+                        </div>
+                    </div>
 
-                        {/* ฟอร์มแลกของ */}
-                        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-600 shadow-xl">
-                            <h3 className="text-xl font-bold text-white mb-4 flex items-center justify-center gap-2"><Flag className="text-pink-500"/> ทำรายการแลกรางวัล</h3>
-                            <div className="flex gap-4 mb-4">
-                                <input 
-                                    type="text" 
-                                    placeholder="ชื่อของรางวัล (เช่น ปากกา, ขนม)" 
-                                    value={rewardForm.name}
-                                    onChange={e => setRewardForm({...rewardForm, name: e.target.value})}
-                                    className="flex-[2] bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white focus:border-pink-500 outline-none transition-all"
-                                />
-                                <input 
-                                    type="number" 
-                                    placeholder="ใช้กี่แต้ม?" 
-                                    value={rewardForm.points}
-                                    onChange={e => setRewardForm({...rewardForm, points: e.target.value})}
-                                    className="flex-1 bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white text-center font-bold focus:border-pink-500 outline-none transition-all"
-                                />
-                            </div>
-                            <button 
+                    <div className="mt-4 text-right">
+                        <div className="text-xs text-yellow-500 font-bold uppercase tracking-widest mb-1">Available Balance</div>
+                        <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-sm leading-none">
+                            {currentBalance.currentBalance.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+
+                {/* ฟอร์มแลกของ (Compact) */}
+                <div className="bg-slate-800 p-5 rounded-3xl border border-slate-600 shadow-xl flex flex-col justify-center">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><Flag className="text-pink-500" size={20}/> ทำรายการแลกรางวัล</h3>
+                    <div className="space-y-3">
+                        <input
+                            type="text"
+                            placeholder="ชื่อของรางวัล..."
+                            value={rewardForm.name}
+                            onChange={e => setRewardForm({...rewardForm, name: e.target.value})}
+                            className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm focus:border-pink-500 outline-none transition-all"
+                        />
+                        <div className="flex gap-3">
+                            <input
+                                type="number"
+                                placeholder="ใช้กี่แต้ม?"
+                                value={rewardForm.points}
+                                onChange={e => setRewardForm({...rewardForm, points: e.target.value})}
+                                className="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm text-center font-bold focus:border-pink-500 outline-none transition-all"
+                            />
+                            <button
                                 onClick={handleRedeem}
                                 disabled={!rewardForm.name || !rewardForm.points}
-                                className={`w-full py-4 rounded-xl font-black text-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
-                                    ${(!rewardForm.name || !rewardForm.points) 
-                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
-                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white border-b-4 border-pink-900'
+                                className={`px-6 rounded-xl font-bold text-sm shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
+                                    ${(!rewardForm.name || !rewardForm.points)
+                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white'
                                     }`}
                             >
-                                <CheckCircle2 size={24}/> ยืนยันการแลก
+                                <CheckCircle2 size={18}/> แลกเลย
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                    </div>
-                  ) : (
-                    <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4 opacity-50">
-                        <Users size={80} className="text-slate-600"/> 
-                        เลือกนักเรียนทางซ้ายเพื่อทำรายการ
-                    </div>
-                  )}
-               </div>
+            {/* ส่วนล่าง: ตารางประวัติการแลก */}
+            <div className="flex-1 bg-slate-800/50 rounded-3xl border border-slate-700 overflow-hidden flex flex-col">
+                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-300 flex items-center gap-2"><Clock size={18}/> ประวัติการแลกของรางวัล</h3>
+                    <span className="text-xs text-slate-500">{redemptionHistory.length} รายการ</span>
+                </div>
+                <div className="overflow-y-auto p-0 custom-scrollbar flex-1">
+                    <table className="w-full text-left text-sm text-slate-400">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-800/50 sticky top-0">
+                            <tr>
+                                <th className="px-4 py-3 font-medium">วัน/เวลา</th>
+                                <th className="px-4 py-3 font-medium">ของรางวัล</th>
+                                <th className="px-4 py-3 font-medium text-right">แต้มที่ใช้</th>
+                                <th className="px-4 py-3 font-medium text-right">ผู้ทำรายการ</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/50">
+                            {redemptionHistory.length > 0 ? (
+                                redemptionHistory.map((item, index) => (
+                                    <tr key={index} className="hover:bg-slate-700/30 transition-colors">
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            {new Date(item.timestamp).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                                            <span className="text-xs text-slate-600 ml-2">{new Date(item.timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </td>
+                                        <td className="px-4 py-3 font-bold text-white">{item.rewardName}</td>
+                                        <td className="px-4 py-3 text-right text-red-400 font-bold">-{item.pointsSpent}</td>
+                                        <td className="px-4 py-3 text-right text-xs">{item.teacherName}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="px-4 py-8 text-center text-slate-600 italic">ยังไม่มีประวัติการแลกของรางวัล</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    ) : (
+        <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4 opacity-50">
+            <Users size={80} className="text-slate-600"/>
+            เลือกนักเรียนทางซ้ายเพื่อทำรายการ
+        </div>
+    )}
+</div>
            </div>
        )}
        </div>

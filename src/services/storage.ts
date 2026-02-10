@@ -6,7 +6,7 @@ const FREEPLAY_QUESTIONS_KEY = 'math_adventure_freeplay_questions';
 const GAME_CONFIG_KEY = 'math_adventure_config';
 const REDEMPTIONS_KEY = 'math_adventure_redemptions'; // Key สำหรับเก็บประวัติแลกของ
 // URL ของ Google Apps Script ที่ Deploy ล่าสุด
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlqlx3vx-z0t1hMQPB_NWOS3wCpXBr682BZMa6hxJpQRyxoxzd5zkaSCNCY64WsiE2/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzC3twnovlKIMjDjV-U6KG44CJbZ-RDCibhIB4g9sXfwKOTWL6Q3znvVrqVFmsZGBe-/exec";
 
 const formatImageLink = (url: string) => {
     if (!url) return '';
