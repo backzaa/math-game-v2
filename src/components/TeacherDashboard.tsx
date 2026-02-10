@@ -621,7 +621,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
        {activeTab === 'REPORTS' && (
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full animate-pop-in">
-               <div className="md:col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col h-[600px]">
+               {/* [แก้ไข] มือถือสูง 250px, จอใหญ่สูง 600px */}
+<div className="md:col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col h-[250px] md:h-[600px]">
                   <div className="p-4 bg-slate-700 font-bold text-slate-300 flex items-center gap-2"><Users size={20}/> รายชื่อนักเรียน</div>
                   <div className="overflow-y-auto flex-1 p-2 space-y-2">
                     {students.map(s => (
@@ -783,7 +784,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                </div>
 
                {/* 2. คอลัมน์ขวา: พื้นที่แลกของ */}
-               <div className="md:col-span-2 bg-slate-900/50 rounded-xl border border-slate-700 p-6 h-[600px] flex flex-col relative overflow-hidden">
+               {/* [แก้ไข] มือถือ h-auto (ยืดตามของ), padding ลดเหลือ 4, ลบ overflow-hidden ในมือถือ */}
+<div className="md:col-span-2 bg-slate-900/50 rounded-xl border border-slate-700 p-4 md:p-6 h-auto md:h-[600px] flex flex-col relative md:overflow-hidden">
     {selectedStudent && currentBalance ? (
         <div className="w-full h-full flex flex-col gap-6 animate-pop-in overflow-y-auto pr-2 custom-scrollbar">
 
@@ -848,7 +850,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
             </div>
 
             {/* ส่วนล่าง: ตารางประวัติการแลก */}
-            <div className="flex-1 bg-slate-800/50 rounded-3xl border border-slate-700 overflow-hidden flex flex-col">
+            <div className="h-[300px] md:h-auto md:flex-1 bg-slate-800/50 rounded-3xl border border-slate-700 overflow-hidden flex flex-col">
                 <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
                     <h3 className="font-bold text-slate-300 flex items-center gap-2"><Clock size={18}/> ประวัติการแลกของรางวัล</h3>
                     <span className="text-xs text-slate-500">{redemptionHistory.length} รายการ</span>
