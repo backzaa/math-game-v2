@@ -27,7 +27,11 @@ const getDirectImageLink = (url: string) => {
 };
 
 export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'REPORTS' | 'QUESTIONS' | 'STUDENTS' | 'ASSETS'>('REPORTS');
+    const [activeTab, setActiveTab] = useState<'REPORTS' | 'QUESTIONS' | 'STUDENTS' | 'ASSETS' | 'REWARDS'>('REPORTS');
+
+  // [เพิ่มใหม่] State สำหรับระบบแลกรางวัล
+  const [rewardForm, setRewardForm] = useState({ name: '', points: '' });
+  const [currentBalance, setCurrentBalance] = useState<any>(null); // เก็บ { totalScore, totalRedeemed, currentBalance }
   const [reportMode, setReportMode] = useState<ScoringMode>('CLASSROOM');
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
@@ -101,6 +105,16 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
   };
 
   useEffect(() => { loadDataFromLocal(); }, [activeTab, questionSettingMode]);
+  // [แทรกตรงนี้] เพิ่ม Effect เพื่ออัปเดตยอดเงินเมื่อเลือกนักเรียน
+  useEffect(() => {
+    if (selectedStudent) {
+        // เรียกฟังก์ชันคำนวณเงินจาก StorageService ที่เราเพิ่งเขียน
+        const balance = StorageService.getStudentBalance(selectedStudent.id);
+        setCurrentBalance(balance);
+    } else {
+        setCurrentBalance(null);
+    }
+}, [selectedStudent, activeTab]); // ทำงานเมื่อเปลี่ยนคน หรือเปลี่ยน Tab (เช่น กลับมาจากหน้าอื่น)
 
   const toggleSessionDetails = (sessionId: string) => {
       setExpandedSessions(prev => {
@@ -297,6 +311,37 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
           alert('รหัสผ่านไม่ถูกต้อง! กรุณาลองใหม่');
       }
   };
+  // [เพิ่มใหม่] ฟังก์ชันกดปุ่มแลกรางวัล
+  const handleRedeem = async () => {
+    if (!selectedStudent || !rewardForm.name || !rewardForm.points) {
+        alert('กรุณากรอกชื่อของรางวัลและจำนวนแต้มครับ');
+        return;
+    }
+
+    const points = parseInt(rewardForm.points);
+    if (isNaN(points) || points <= 0) {
+        alert('จำนวนแต้มต้องมากกว่า 0 ครับ');
+        return;
+    }
+
+    if (currentBalance.currentBalance < points) {
+        alert(`แต้มไม่พอครับ! (ขาดอีก ${points - currentBalance.currentBalance} คะแนน)`);
+        return;
+    }
+
+    if (confirm(`ยืนยันการแลก "${rewardForm.name}" ด้วย ${points} คะแนน?`)) {
+        const success = await StorageService.redeemReward(selectedStudent.id, rewardForm.name, points, 'ครูผู้สอน');
+        if (success) {
+            alert('แลกรางวัลสำเร็จ! 🎉');
+            setRewardForm({ name: '', points: '' });
+            // อัปเดตยอดเงินทันที
+            const newBalance = StorageService.getStudentBalance(selectedStudent.id);
+            setCurrentBalance(newBalance);
+        } else {
+            alert('เกิดข้อผิดพลาดในการบันทึกครับ');
+        }
+    }
+};
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white font-sans overflow-hidden">
@@ -359,6 +404,8 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
               <button onClick={() => setActiveTab('QUESTIONS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'QUESTIONS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>จัดการโจทย์</button>
               <button onClick={() => setActiveTab('ASSETS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'ASSETS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>ตั้งค่าเกม</button>
               <button onClick={() => setActiveTab('STUDENTS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'STUDENTS' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>รายชื่อนักเรียน</button>
+              {/* [แทรกตรงนี้ครับ] ปุ่มเมนูใหม่ */}
+              <button onClick={() => setActiveTab('REWARDS')} className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold transition flex-shrink-0 ${activeTab === 'REWARDS' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>🎁 แลกของรางวัล</button>
               <button onClick={onLogout} className="hidden md:flex text-red-400 hover:text-white items-center gap-2 px-3 py-1 rounded-lg border border-red-900/30 transition-all hover:bg-red-900/20 whitespace-nowrap ml-auto">
                  <LogOut size={18}/> ออก
               </button>
@@ -692,6 +739,103 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                       </div>
                     </div>
                   ) : ( <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4"><BarChart size={60} className="opacity-10"/> เลือกนักเรียนทางซ้ายเพื่อดูผลการเรียน</div> )}
+               </div>
+           </div>
+       )}
+       {activeTab === 'REWARDS' && (
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full animate-pop-in">
+               {/* 1. คอลัมน์ซ้าย: รายชื่อนักเรียน (ก๊อปปี้ดีไซน์จากหน้า Reports มาได้เลย แต่เปลี่ยนหัวข้อ) */}
+               <div className="md:col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col h-[600px]">
+                  <div className="p-4 bg-pink-700 font-bold text-white flex items-center gap-2">
+                      <Users size={20}/> เลือกนักเรียนเพื่อแลกของ
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                    {students.map(s => (
+                      <div key={s.id} onClick={() => setSelectedStudent(s)} className={`p-4 rounded-xl cursor-pointer flex justify-between items-center transition ${selectedStudent?.id === s.id ? 'bg-pink-600 text-white shadow-lg' : 'bg-slate-700/50 hover:bg-slate-600'}`}>
+                        <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-600 border border-white/20">
+                             {s.profileImage ? (<img src={s.profileImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />) : (<div className="w-full h-full flex items-center justify-center text-[10px]">{s.id}</div>)}
+                           </div>
+                           <div><span className="font-bold">No.{s.id}</span> <span className="ml-2">{s.firstName}</span></div>
+                        </div>
+                        <ChevronRight size={16} />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+
+               {/* 2. คอลัมน์ขวา: พื้นที่แลกของ */}
+               <div className="md:col-span-2 bg-slate-900/50 rounded-xl border border-slate-700 p-6 h-[600px] flex flex-col items-center justify-center relative">
+                  {selectedStudent && currentBalance ? (
+                    <div className="w-full max-w-lg space-y-8 text-center animate-pop-in">
+                        
+                        {/* การ์ดแสดงยอดเงิน */}
+                        <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-[40px] border-4 border-yellow-500/50 shadow-2xl overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500"></div>
+                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl animate-pulse"></div>
+                            
+                            <h2 className="text-2xl font-bold text-slate-300 mb-2">ยอดคะแนนคงเหลือของ</h2>
+                            <h1 className="text-4xl font-black text-white mb-6 drop-shadow-md">{selectedStudent.firstName} {selectedStudent.lastName}</h1>
+                            
+                            <div className="flex items-center justify-center gap-4 mb-4">
+                                <div className="text-right">
+                                    <div className="text-xs text-slate-400 uppercase tracking-widest">คะแนนสะสมรวม</div>
+                                    <div className="text-xl font-bold text-slate-300">{currentBalance.totalScore.toLocaleString()}</div>
+                                </div>
+                                <div className="h-10 w-[2px] bg-slate-600"></div>
+                                <div className="text-left">
+                                    <div className="text-xs text-slate-400 uppercase tracking-widest">ใช้ไปแล้ว</div>
+                                    <div className="text-xl font-bold text-red-400">-{currentBalance.totalRedeemed.toLocaleString()}</div>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-950/50 rounded-2xl p-4 border border-yellow-500/30">
+                                <div className="text-sm font-bold text-yellow-500 uppercase tracking-[0.2em] mb-1">Current Balance</div>
+                                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-lg">
+                                    {currentBalance.currentBalance.toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ฟอร์มแลกของ */}
+                        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-600 shadow-xl">
+                            <h3 className="text-xl font-bold text-white mb-4 flex items-center justify-center gap-2"><Flag className="text-pink-500"/> ทำรายการแลกรางวัล</h3>
+                            <div className="flex gap-4 mb-4">
+                                <input 
+                                    type="text" 
+                                    placeholder="ชื่อของรางวัล (เช่น ปากกา, ขนม)" 
+                                    value={rewardForm.name}
+                                    onChange={e => setRewardForm({...rewardForm, name: e.target.value})}
+                                    className="flex-[2] bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white focus:border-pink-500 outline-none transition-all"
+                                />
+                                <input 
+                                    type="number" 
+                                    placeholder="ใช้กี่แต้ม?" 
+                                    value={rewardForm.points}
+                                    onChange={e => setRewardForm({...rewardForm, points: e.target.value})}
+                                    className="flex-1 bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white text-center font-bold focus:border-pink-500 outline-none transition-all"
+                                />
+                            </div>
+                            <button 
+                                onClick={handleRedeem}
+                                disabled={!rewardForm.name || !rewardForm.points}
+                                className={`w-full py-4 rounded-xl font-black text-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
+                                    ${(!rewardForm.name || !rewardForm.points) 
+                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
+                                        : 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white border-b-4 border-pink-900'
+                                    }`}
+                            >
+                                <CheckCircle2 size={24}/> ยืนยันการแลก
+                            </button>
+                        </div>
+
+                    </div>
+                  ) : (
+                    <div className="text-slate-500 text-center mt-20 text-xl font-bold flex flex-col items-center gap-4 opacity-50">
+                        <Users size={80} className="text-slate-600"/> 
+                        เลือกนักเรียนทางซ้ายเพื่อทำรายการ
+                    </div>
+                  )}
                </div>
            </div>
        )}

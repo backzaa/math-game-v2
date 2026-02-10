@@ -103,3 +103,18 @@ export interface GameGlobalConfig {
     bgmPlaylist: string[];
     menuPlaylist: string[];
 }
+// [เพิ่มใหม่] โครงสร้างข้อมูลประวัติการแลกของรางวัล
+export interface RedemptionRecord {
+  timestamp: string;
+  studentId: string;
+  rewardName: string;
+  pointsSpent: number;
+  teacherName: string;
+}
+
+// [เพิ่มใหม่] โครงสร้างข้อมูลยอดเงินคงเหลือ (เอาไว้โชว์หน้า UI)
+export interface StudentBalance {
+  totalScore: number;      // คะแนนสะสมตลอดชีพ (Income)
+  totalRedeemed: number;   // คะแนนที่แลกไปแล้ว (Expense)
+  currentBalance: number;  // คะแนนคงเหลือที่ใช้ได้ (Balance)
+}

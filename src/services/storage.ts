@@ -1,9 +1,11 @@
-import type { StudentProfile, GameSession, MathQuestion, Gender, GameGlobalConfig } from '../types';
+import type { StudentProfile, GameSession, MathQuestion, Gender, GameGlobalConfig, RedemptionRecord, StudentBalance } from '../types';
 
 const STORAGE_KEY = 'math_adventure_students';
 const DAILY_QUESTIONS_KEY = 'math_adventure_daily_questions';
 const FREEPLAY_QUESTIONS_KEY = 'math_adventure_freeplay_questions'; 
 const GAME_CONFIG_KEY = 'math_adventure_config';
+const REDEMPTIONS_KEY = 'math_adventure_redemptions'; // Key สำหรับเก็บประวัติแลกของ
+// URL ของ Google Apps Script ที่ Deploy ล่าสุด
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlqlx3vx-z0t1hMQPB_NWOS3wCpXBr682BZMa6hxJpQRyxoxzd5zkaSCNCY64WsiE2/exec";
 
 const formatImageLink = (url: string) => {
@@ -88,21 +90,87 @@ export const StorageService = {
           } catch (e) { console.error("Error deleting score:", e); }
       }
   },
-  // ... (ต่อจากปีกกาปิดของ deleteSession)
 
-  // [เพิ่มใหม่] ฟังก์ชันฝัง Lock ลงเครื่อง
+  // --- ระบบล็อคโหมดห้องเรียน (Locking) ---
   markPlayedToday: (studentId: string) => {
     const today = new Date().toISOString().split('T')[0];
     localStorage.setItem(`locked_classroom_${studentId}_${today}`, 'true');
-},
+  },
 
-// [เพิ่มใหม่] เช็คว่าเครื่องนี้มี Lock หรือไม่
-checkLocalPlayedToday: (studentId: string): boolean => {
+  checkLocalPlayedToday: (studentId: string): boolean => {
     const today = new Date().toISOString().split('T')[0];
     return localStorage.getItem(`locked_classroom_${studentId}_${today}`) === 'true';
-},
+  },
 
-// ... (ก่อนถึง saveScore)
+  // --- ระบบแลกของรางวัล (Redemption System) ---
+  
+  // 1. ดึงประวัติการแลกทั้งหมดจาก Local
+  getAllRedemptions: (): RedemptionRecord[] => {
+      try {
+          const data = localStorage.getItem(REDEMPTIONS_KEY);
+          return data ? JSON.parse(data) : [];
+      } catch (e) { return []; }
+  },
+
+  // 2. คำนวณยอดเงินคงเหลือ (รายรับ - รายจ่าย)
+  getStudentBalance: (studentId: string): StudentBalance => {
+      const students = StorageService.getAllStudents();
+      const student = students.find(s => String(s.id) === String(studentId)); // ใช้ String comparison เพื่อความชัวร์
+      const redemptions = StorageService.getAllRedemptions();
+
+      // คำนวณรายรับ (Total Score)
+      let totalScore = 0;
+      if (student && student.sessions) {
+          totalScore = student.sessions.reduce((sum, sess) => sum + (sess.score || 0), 0);
+      }
+
+      // คำนวณรายจ่าย (Total Redeemed) ของเด็กคนนี้
+      const myRedemptions = redemptions.filter(r => String(r.studentId) === String(studentId));
+      const totalRedeemed = myRedemptions.reduce((sum, r) => sum + (r.pointsSpent || 0), 0);
+
+      return {
+          totalScore: totalScore,
+          totalRedeemed: totalRedeemed,
+          currentBalance: totalScore - totalRedeemed
+      };
+  },
+
+  // 3. สั่งแลกของรางวัล
+  redeemReward: async (studentId: string, rewardName: string, points: number, teacherName: string) => {
+      // บันทึกลง Local Storage ทันที
+      const newRecord: RedemptionRecord = {
+          timestamp: new Date().toISOString(),
+          studentId: studentId,
+          rewardName: rewardName,
+          pointsSpent: points,
+          teacherName: teacherName
+      };
+
+      const allRedemptions = StorageService.getAllRedemptions();
+      allRedemptions.push(newRecord);
+      localStorage.setItem(REDEMPTIONS_KEY, JSON.stringify(allRedemptions));
+
+      // ส่งไปบันทึก Cloud (Google Sheet: reward_history)
+      try {
+          await fetch(SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              body: JSON.stringify({
+                  action: 'redeemReward',
+                  studentId: studentId,
+                  rewardName: rewardName,
+                  pointsSpent: points,
+                  teacherName: teacherName
+              })
+          });
+          return true;
+      } catch (e) {
+          console.error("Redeem Error", e);
+          return false;
+      }
+  },
+
+  // --- End Reward System ---
 
   saveScore: async (
     id: string, 
@@ -115,10 +183,11 @@ checkLocalPlayedToday: (studentId: string): boolean => {
     gameType: string = 'CLASSIC',
     totalDistance: number = 0
   ) => {
-    // [แทรกตรงนี้!] ถ้าเป็นโหมดห้องเรียน ให้ฝัง Lock ลงเครื่องทันที
-    if (mode === 'CLASSROOM') {
-        StorageService.markPlayedToday(id);
-    }
+      // [Lock Logic] ถ้าเป็นโหมดห้องเรียน ให้ฝัง Lock ลงเครื่องทันที
+      if (mode === 'CLASSROOM' && id !== '00') {
+          StorageService.markPlayedToday(id);
+      }
+
       if (id === '00') {
           try { 
               await fetch(SCRIPT_URL, { 
@@ -260,9 +329,7 @@ checkLocalPlayedToday: (studentId: string): boolean => {
                   sessionId: sc.timestamp,
                   date: new Date(sc.timestamp).toLocaleDateString('th-TH'),
                   timestamp: sc.timestamp,
-                  // [จุดสำคัญ] เพิ่มบรรทัดนี้เพื่อเก็บชื่อ
                   playedBy: sc.studentName || sc.name || sc.Student_Name,
-                  
                   realScore: Number(sc.realScore) || 0,
                   bonusScore: Number(sc.bonusScore) || 0,
                   score: Number(sc.totalScore) || 0,
@@ -286,10 +353,16 @@ checkLocalPlayedToday: (studentId: string): boolean => {
       if (data.settings) localStorage.setItem(GAME_CONFIG_KEY, JSON.stringify(data.settings));
       if (data.dailyQs) localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(data.dailyQs));
       if (data.freeplayQs) localStorage.setItem(FREEPLAY_QUESTIONS_KEY, JSON.stringify(data.freeplayQs));
+      
+      // [Sync Reward History] ดึงข้อมูลแลกของจาก Cloud
+      if (data.redemptions) {
+          localStorage.setItem(REDEMPTIONS_KEY, JSON.stringify(data.redemptions));
+      }
+
       return true;
 
     } catch (e) { return false; }
-},
+  },
 
   saveDailyQuestions: async (qs: MathQuestion[]) => {
       localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(qs));
@@ -307,19 +380,16 @@ checkLocalPlayedToday: (studentId: string): boolean => {
   
   getFreeplayQuestions: () => { const d = localStorage.getItem(FREEPLAY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; },
 
- // ... (วางต่อจาก getFreeplayQuestions)
-
-  // [เพิ่มใหม่] บันทึกสถานะเกม (Auto-Save)
+  // --- Auto-Save System ---
   saveGameState: (data: any) => {
     const payload = {
-        date: new Date().toISOString().split('T')[0], // แปะวันที่ไว้เช็คข้ามวัน
+        date: new Date().toISOString().split('T')[0], 
         data: data
     };
     localStorage.setItem('math_game_autosave', JSON.stringify(payload));
-},
+  },
 
-// [เพิ่มใหม่] โหลดสถานะเกม (Auto-Resume)
-loadGameState: () => {
+  loadGameState: () => {
     try {
         const raw = localStorage.getItem('math_game_autosave');
         if (!raw) return null;
@@ -327,21 +397,15 @@ loadGameState: () => {
         const parsed = JSON.parse(raw);
         const today = new Date().toISOString().split('T')[0];
 
-        // เช็คว่าเซฟเป็นของวันนี้หรือเปล่า?
         if (parsed.date !== today) {
-            // ถ้าเป็นของเมื่อวาน ให้ลบทิ้งเลย (เริ่มวันใหม่)
             localStorage.removeItem('math_game_autosave');
             return null;
         }
-
         return parsed.data;
-    } catch (e) {
-        return null;
-    }
-},
+    } catch (e) { return null; }
+  },
 
-// [เพิ่มใหม่] ลบเซฟเมื่อจบเกม หรือครูสั่งล้าง
-clearGameState: () => {
-    localStorage.removeItem('math_game_autosave');
-} 
+  clearGameState: () => {
+      localStorage.removeItem('math_game_autosave');
+  } 
 };

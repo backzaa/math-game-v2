@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { UserRole } from '../types';
 import { StorageService } from '../services/storage';
-import { User, Star, GraduationCap, Plus, Divide, Calculator, Infinity, Pi, Sigma, Sparkles, Zap } from 'lucide-react';
+import { User, GraduationCap, Plus, Divide, Calculator, Infinity, Pi, Sigma, Sparkles, Zap, Trophy, Coins } from 'lucide-react';
 
 // --- รวม Animation และ Keyframes ---
 const customStyles = `
@@ -90,10 +90,18 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
         } else if (studentId.length >= 1) {
             const student = StorageService.getStudent(studentId);
             if (student) {
-                const score = student.sessions ? student.sessions.filter(s => s.mode === 'CLASSROOM').reduce((sum, s) => sum + (s.score || 0), 0) : 0;
-                setDisplayData({ type: 'STUDENT', student, score });
+                // [แก้ไข] ใช้ฟังก์ชันดึงยอดเงิน (Balance) ที่เราเพิ่งทำใน storage.ts
+                const balanceData = StorageService.getStudentBalance(student.id);
+                
+                setDisplayData({ 
+                    type: 'STUDENT', 
+                    student, 
+                    score: balanceData.totalScore,      // คะแนนรวมทั้งหมด
+                    balance: balanceData.currentBalance // คะแนนที่เหลือใช้ได้
+                });
                 showTimer = setTimeout(() => setShowCard(true), 50);
             } else {
+                // ... (ส่วน else คงเดิม) ...
                 setShowCard(false);
                 hideTimer = setTimeout(() => setDisplayData(null), 700);
             }
@@ -292,12 +300,29 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                             )}
                         </div>
                         {displayData.type !== 'GUEST' && (
-                            <div className="bg-slate-900/80 rounded-[40px] p-6 w-full border-2 border-amber-500/30 shadow-inner group transition-transform hover:scale-105">
-                                <div className="flex items-center justify-center gap-2 mb-2 text-amber-400">
-                                    <Star size={24} fill="currentColor" className="animate-spin-slow" />
-                                    <span className="text-sm font-bold uppercase tracking-widest text-amber-200">คะแนนสะสมรวม</span>
+                            <div className="grid grid-cols-2 gap-4 w-full mt-4 animate-pop-in">
+                                {/* 1. กล่องซ้าย: คะแนนสะสมรวม (เกียรติยศ) */}
+                                <div className="bg-slate-900/80 rounded-2xl p-3 md:p-4 border border-amber-500/30 shadow-inner group transition-transform hover:scale-105">
+                                    <div className="flex items-center justify-center gap-1 mb-1 md:mb-2 text-amber-400">
+                                        <Trophy size={20} className="animate-bounce" />
+                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-amber-200">เกียรติยศรวม</span>
+                                    </div>
+                                    <div className="text-2xl md:text-4xl font-black text-white drop-shadow-lg tracking-tighter">
+                                        {(displayData.score || 0).toLocaleString()}
+                                    </div>
                                 </div>
-                                <div className="text-5xl md:text-6xl font-black text-white drop-shadow-lg tracking-tighter">{displayData.score}</div>
+
+                                {/* 2. กล่องขวา: คะแนนคงเหลือ (ใช้แลกของ) */}
+                                <div className="bg-gradient-to-br from-green-900/80 to-emerald-900/80 rounded-2xl p-3 md:p-4 border border-emerald-500/50 shadow-lg group transition-transform hover:scale-105 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-10 h-10 bg-green-400/20 rounded-full blur-xl animate-pulse"></div>
+                                    <div className="flex items-center justify-center gap-1 mb-1 md:mb-2 text-green-400">
+                                        <Coins size={20} className="animate-spin-slow" />
+                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-green-200">แลกของได้</span>
+                                    </div>
+                                    <div className="text-2xl md:text-4xl font-black text-green-300 drop-shadow-md tracking-tighter">
+                                        {(displayData.balance || 0).toLocaleString()}
+                                    </div>
+                                </div>
                             </div>
                         )}
                       </div>
