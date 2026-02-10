@@ -6,7 +6,7 @@ const FREEPLAY_QUESTIONS_KEY = 'math_adventure_freeplay_questions';
 const GAME_CONFIG_KEY = 'math_adventure_config';
 const REDEMPTIONS_KEY = 'math_adventure_redemptions'; // Key สำหรับเก็บประวัติแลกของ
 // URL ของ Google Apps Script ที่ Deploy ล่าสุด
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzC3twnovlKIMjDjV-U6KG44CJbZ-RDCibhIB4g9sXfwKOTWL6Q3znvVrqVFmsZGBe-/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwsOBj0oj-1RSL5EjmLq5lKa7YHKGwxuP6MYPV93hJg2rPnvj01VXEpmEC0S7HS440/exec";
 
 const formatImageLink = (url: string) => {
     if (!url) return '';
@@ -181,13 +181,15 @@ export const StorageService = {
     mode: string, 
     details: any[],
     gameType: string = 'CLASSIC',
-    totalDistance: number = 0
+    totalDistance: number = 0,
+    duration: number = 0 // [แก้ไข 1] รับค่าเวลาเพิ่มตรงนี้
   ) => {
       // [Lock Logic] ถ้าเป็นโหมดห้องเรียน ให้ฝัง Lock ลงเครื่องทันที
       if (mode === 'CLASSROOM' && id !== '00') {
           StorageService.markPlayedToday(id);
       }
 
+      // --- กรณี Guest (ID 00) ---
       if (id === '00') {
           try { 
               await fetch(SCRIPT_URL, { 
@@ -202,21 +204,23 @@ export const StorageService = {
                       mode, 
                       details,
                       gameType,
-                      totalDistance
+                      totalDistance,
+                      duration // [แก้ไข 2] ส่งเวลาของ Guest ไปด้วย
                   }) 
               }); 
           } catch (e) {}
           return; 
       }
 
+      // --- กรณีนักเรียนปกติ ---
       const students = StorageService.getAllStudents();
       const idx = students.findIndex(s => String(Number(s.id)) === String(Number(id)));
       
       if (idx !== -1) {
           const newSession: GameSession = {
               sessionId: Date.now().toString(),
-              date: new Date().toISOString().split('T')[0],
-              timestamp: new Date().toISOString(),
+              date: new Date().toLocaleDateString('th-TH'), // ใช้ toLocaleDateString ให้ตรงกับ Format ไทย
+              timestamp: new Date().toISOString(), // [แก้ไข] ใช้ ISO String เหมือนเดิม เพื่อแก้ Error types
               score,
               realScore,
               bonusScore,
@@ -224,12 +228,14 @@ export const StorageService = {
               details,
               // @ts-ignore
               gameType,
-              totalDistance
+              totalDistance,
+              duration // [แก้ไข 3] บันทึกเวลาลงในประวัติเครื่อง (เพื่อให้หน้าครูเห็น)
           };
 
           if (!students[idx].sessions) students[idx].sessions = [];
           students[idx].sessions.push(newSession);
           
+          // อัปเดตคะแนนรวม (ถ้ามี logic นี้อยู่แล้ว)
           const currentTotal = (students[idx] as any).score || 0;
           (students[idx] as any).score = currentTotal + realScore; 
 
@@ -248,7 +254,8 @@ export const StorageService = {
                       mode, 
                       details,
                       gameType,
-                      totalDistance
+                      totalDistance,
+                      duration // [แก้ไข 4] ส่งเวลาไปให้ Google Sheet
                   }) 
               }); 
           } catch (e) {}

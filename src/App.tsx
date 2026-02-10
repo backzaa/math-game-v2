@@ -551,6 +551,9 @@ export function App() {
     }
 
     if (screen === 'GAME' && selectedTheme) {
+      // ---------------------------------------------------------
+      // กรณี 1: SmartBoard (Rally) -> ไม่มีการจับเวลา (ส่ง 0)
+      // ---------------------------------------------------------
       if (gameType === 'RALLY') {
         return (
           <SmartBoard 
@@ -559,15 +562,13 @@ export function App() {
               questions={activeGameQuestions}
               mode={gameMode} 
               onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])}
-              onGameEnd={(dist, score) => {
-                  // ... (โค้ดข้างในเหมือนเดิม)
+              onGameEnd={(dist, score) => { // ไม่ต้องรับ duration
                   if (currentStudentId) {
-                      // [แก้] เพิ่ม currentStudentId === '00' ? guestName : '' เป็นตัวที่ 3
                       StorageService.addSession(
                           currentStudentId, 
                           { 
                               sessionId: Date.now().toString(), 
-                              date: new Date().toISOString().split('T')[0], 
+                              date: new Date().toLocaleDateString('th-TH'),
                               timestamp: new Date().toISOString(), 
                               score: score, 
                               realScore: score, 
@@ -577,18 +578,24 @@ export function App() {
                               // @ts-ignore
                               gameType: 'RALLY', 
                               // @ts-ignore
-                              totalDistance: dist
+                              totalDistance: dist,
+                              
+                              duration: 0 // [Fix] SmartBoard ให้เวลาเป็น 0 เสมอ
                           }, 
-                          currentStudentId === '00' ? guestName : '' // <--- ใส่ตรงนี้ (ในวงเล็บ)
+                          currentStudentId === '00' ? guestName : '' 
                       );
                   }
                   setScreen('RETURNING'); 
                   setSelectedTheme(null);
               }}
-                onExit={() => setScreen('RETURNING')}
+              onExit={() => setScreen('RETURNING')}
              />
           );
-      } else {
+      } 
+      // ---------------------------------------------------------
+      // กรณี 2: GameBoard (Classic) -> มีการจับเวลา!
+      // ---------------------------------------------------------
+      else {
           return (
             <GameBoard 
                 players={gamePlayers} 
@@ -598,29 +605,37 @@ export function App() {
                 questions={activeGameQuestions}
                 onTurnComplete={(p) => setGamePlayers(p)} 
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
-                onGameEnd={() => { 
-                  if (currentStudentId) {
-                      // [แก้] เพิ่ม currentStudentId === '00' ? guestName : '' เป็นตัวที่ 3
-                      StorageService.addSession(
-                          currentStudentId, 
-                          { 
-                              sessionId: Date.now().toString(), 
-                              date: new Date().toISOString().split('T')[0], 
-                              timestamp: new Date().toISOString(), 
-                              score: gamePlayers[0].score, 
-                              mode: gameMode, 
-                              details: sessionDetails,
-                              // @ts-ignore
-                              gameType: 'CLASSIC',
-                              // @ts-ignore
-                              totalDistance: 0
-                          }, 
-                          currentStudentId === '00' ? guestName : '' // <--- ใส่ตรงนี้ (ในวงเล็บ)
-                      );
-                  }
-                  setScreen('RETURNING'); 
-                  setSelectedTheme(null); 
-              }} 
+                
+                // [Fix] รับค่า duration ที่ส่งมาจาก GameBoard
+                // ในส่วน else (ที่เป็น GameBoard)
+onGameEnd={(dist, score, duration = 0) => { 
+  if (currentStudentId) {
+      StorageService.addSession(
+          currentStudentId, 
+          { 
+              sessionId: Date.now().toString(), 
+              date: new Date().toLocaleDateString('th-TH'), 
+              timestamp: new Date().toISOString(), 
+              score: score, 
+              realScore: score, 
+              bonusScore: 0, 
+              mode: gameMode, 
+              details: sessionDetails,
+              // @ts-ignore
+              gameType: 'CLASSIC',
+              
+              // [แก้ไข] ใช้ค่า dist ที่รับมาใส่เข้าไปเลย (Warning จะหายไป)
+              // @ts-ignore
+              totalDistance: dist, 
+              
+              duration: duration
+          }, 
+          currentStudentId === '00' ? guestName : '' 
+      );
+  }
+  setScreen('RETURNING'); 
+  setSelectedTheme(null); 
+}} 
                 onExit={() => setScreen('RETURNING')} 
             />
           );

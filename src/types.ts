@@ -36,19 +36,22 @@ export interface QuestionDetail {
 }
 
 export interface GameSession {
-    sessionId: string;
-    date: string;       
-    score: number;
-    mode: ScoringMode;
-    timestamp: string;
-    details: QuestionDetail[]; 
-    isManual?: boolean;
-    note?: string;
-    realScore?: number;
-    bonusScore?: number;
-    // [เพิ่ม] ข้อมูลสำหรับเกมแบบ Rally
-    gameType?: GameType;
-    totalDistance?: number;
+  sessionId: string;
+  date: string;       
+  score: number;
+  mode: ScoringMode;
+  timestamp: string;
+  details: QuestionDetail[]; 
+  isManual?: boolean;
+  note?: string;
+  realScore?: number;
+  bonusScore?: number;
+  // [เพิ่ม] ข้อมูลสำหรับเกมแบบ Rally
+  gameType?: GameType;
+  totalDistance?: number;
+  
+  // [เพิ่มใหม่] เก็บเวลาที่ใช้เล่น (วินาที) ✅
+  duration?: number; 
 }
 
 export interface StudentProfile {
