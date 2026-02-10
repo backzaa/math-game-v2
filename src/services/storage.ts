@@ -6,7 +6,7 @@ const FREEPLAY_QUESTIONS_KEY = 'math_adventure_freeplay_questions';
 const GAME_CONFIG_KEY = 'math_adventure_config';
 const REDEMPTIONS_KEY = 'math_adventure_redemptions'; // Key สำหรับเก็บประวัติแลกของ
 // URL ของ Google Apps Script ที่ Deploy ล่าสุด
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwsOBj0oj-1RSL5EjmLq5lKa7YHKGwxuP6MYPV93hJg2rPnvj01VXEpmEC0S7HS440/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvDnSpbZX6DRcCM05HGYt82-fUR0zSiaoWHsVOAeg7N91ccR9Uiws_ffWNCYD1N3an/exec";
 
 const formatImageLink = (url: string) => {
     if (!url) return '';
@@ -290,7 +290,7 @@ export const StorageService = {
     );
 },
 
-  syncFromCloud: async () => {
+syncFromCloud: async () => {
     try {
       const resp = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
       const data = await resp.json();
@@ -315,7 +315,8 @@ export const StorageService = {
                         mode: sc.mode,
                         details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
                         gameType: sc.gameType || 'CLASSIC',
-                        totalDistance: Number(sc.totalDistance) || 0
+                        totalDistance: Number(sc.totalDistance) || 0,
+                        duration: Number(sc.duration) || 0  // [จุดที่ 1] รับค่าเวลาของนักเรียน
                     }))
                 };
             });
@@ -347,7 +348,8 @@ export const StorageService = {
                   mode: sc.mode,
                   details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
                   gameType: sc.gameType || 'CLASSIC',
-                  totalDistance: Number(sc.totalDistance) || 0
+                  totalDistance: Number(sc.totalDistance) || 0,
+                  duration: Number(sc.duration) || 0 // [จุดที่ 2] รับค่าเวลาของ Guest
               }))
           };
           
@@ -365,7 +367,6 @@ export const StorageService = {
       if (data.dailyQs) localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(data.dailyQs));
       if (data.freeplayQs) localStorage.setItem(FREEPLAY_QUESTIONS_KEY, JSON.stringify(data.freeplayQs));
       
-      // [Sync Reward History] ดึงข้อมูลแลกของจาก Cloud
       if (data.redemptions) {
           localStorage.setItem(REDEMPTIONS_KEY, JSON.stringify(data.redemptions));
       }
