@@ -124,17 +124,15 @@ export const GameBoard: React.FC<Props> = ({
   // [เพิ่มใหม่ 1] State เวลา และ Logic การเดินเวลา
   const [elapsedTime, setElapsedTime] = useState<number>(savedData?.elapsedTime ?? 0);
 
-  useEffect(() => {
-      let timer: any;
-      if (!gameFinished && !activeQuestion && !activeOverlay) {
-          // เดินเวลาเมื่อเกมยังไม่จบ (และอาจจะหยุดตอนตอบคำถาม ถ้าต้องการ หรือปล่อยไหลก็ได้)
-          // ในที่นี้ขอปล่อยไหลตลอด เพื่อกดดันนิดๆ ยกเว้นจบเกม
-          timer = setInterval(() => {
-              setElapsedTime(prev => prev + 1);
-          }, 1000);
-      }
-      return () => clearInterval(timer);
-  }, [gameFinished]); // จับเวลาตลอดจนกว่าจะจบเกม
+useEffect(() => {
+    let timer: any;
+    if (!gameFinished && !activeQuestion && !activeOverlay) {
+        timer = setInterval(() => {
+            setElapsedTime(prev => prev + 1);
+        }, 1000);
+    }
+    return () => clearInterval(timer);
+}, [gameFinished]); // *แนะนำ: ถ้าอยากให้หยุดเวลาตอนตอบคำถาม ให้เพิ่ม activeQuestion ใน [] ด้วย
 
   // ฟังก์ชันแปลงเวลาเป็น MM:SS
   const formatTime = (seconds: number) => {
