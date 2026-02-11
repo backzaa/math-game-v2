@@ -105,9 +105,7 @@ const [runnerState, setRunnerState] = useState<RunnerState>('RUN');
 
 // ถ้ามีเซฟ ให้ข้ามสถานะ READY ไปเป็น PLAYING เลย
 // [แก้ไข] ถ้ามีเซฟ ให้เข้าโหมด 'QUIZ' (ตอบคำถาม) ทันที เพื่อให้ Pop-up เด้งขึ้นมา
-const [gameState, setGameState] = useState<'READY' | 'PLAYING' | 'QUIZ' | 'ROLL' | 'MOVING' | 'FINISHED'>(
-    savedData ? 'QUIZ' : 'READY'
-);
+const [gameState, setGameState] = useState<'READY' | 'PLAYING' | 'QUIZ' | 'ROLL' | 'MOVING' | 'FINISHED'>('READY');
   
   const [displayNumber, setDisplayNumber] = useState(1);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -254,48 +252,60 @@ useEffect(() => {
 
   const handleStartGame = () => {
     setHasInteracted(true);
-    // [เพิ่ม] สร้าง Audio Object ตรงนี้แทน (ตอนที่นิ้วแตะจอจริงๆ)
+    
+    // 1. จัดการเรื่องเสียง
     if (!audioRef.current) {
         audioRef.current = new Audio();
         audioRef.current.volume = bgmVolume;
-        // เพิ่ม Event Listener ตรงนี้แทน
         audioRef.current.addEventListener('ended', handleNextSong);
     }
 
-    // [แก้ไขจุดสำคัญ!] เช็คก่อนว่ามีเซฟเกมไหม? ถ้ามีห้ามรีเซ็ตค่า!
+    // 2. ถ้ามีเซฟ (Resume Game)
     if (savedData) {
-        // ถ้ามีเซฟ ให้เล่นเพลงแล้วจบฟังก์ชันเลย (ใช้ค่าเดิมที่โหลดมา)
+        // เล่นเพลงต่อ (ถ้ามี)
         if (activePlaylist.length > 0) {
             const randomIndex = Math.floor(Math.random() * activePlaylist.length);
             setCurrentSongIndex(randomIndex);
             setIsPlaying(true);
-            
             if (audioRef.current) {
                 audioRef.current.src = getDirectAudioLink(activePlaylist[randomIndex]);
-                audioRef.current.play().catch(e => console.error("Start play error:", e));
+                audioRef.current.play().catch(e => console.error("Resume play error:", e));
             }
         }
-        return; // *** จบตรงนี้เลย ห้ามวิ่งลงไปบรรทัดล่าง ***
+
+        // [สำคัญ] เปลี่ยน State ไปเป็นหน้า QUIZ เพื่อเล่นต่อทันที
+        setGameState('QUIZ'); 
+        
+        // ดึงโจทย์ข้อปัจจุบันมาแสดง
+        if (questions[currentQuestionIdx]) {
+            setActiveQuestion(questions[currentQuestionIdx]);
+        }
+        return; 
     }
 
-    // --- ถ้าไม่มีเซฟ ถึงจะให้เริ่มใหม่ ---
+    // 3. ถ้าไม่มีเซฟ (Start New Game)
     setGameState('PLAYING');
     setRunnerState('IDLE');
     setVisualEnergy(10); 
     setCalcLeft(2); 
-    setCurrentQuestionIdx(0); // <--- บรรทัดนี้แหละครับตัวการ
+    setCurrentQuestionIdx(0); 
     processingRef.current = false;
       
     if (activePlaylist.length > 0) {
          const randomIndex = Math.floor(Math.random() * activePlaylist.length);
          setCurrentSongIndex(randomIndex);
          setIsPlaying(true);
-         
          if (audioRef.current) {
              audioRef.current.src = getDirectAudioLink(activePlaylist[randomIndex]);
              audioRef.current.play().catch(e => console.error("Start play error:", e));
          }
     }
+    
+    // เริ่มด้วยการรอแป๊บนึงแล้วแสดงโจทย์ข้อแรก
+    setTimeout(() => {
+        setRunnerState('RUN');
+        setTimeout(() => showQuestion(0), 1000);
+    }, 500);
   };
 
   // -----------------------------------------------------
@@ -517,7 +527,18 @@ useEffect(() => {
               <button 
                   onClick={forcePlayAudio} 
                   className="bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 border-2 border-white hover:bg-red-500 transition-colors"
-              >
+              >{/* [เพิ่มใหม่] ฝัง Animation ไว้ตรงนี้เลย ไม่ต้องไปไฟล์อื่น */}
+              <style>{`
+                @keyframes bounceIn {
+                  0% { transform: scale(0.3); opacity: 0; }
+                  50% { transform: scale(1.05); opacity: 1; }
+                  70% { transform: scale(0.9); }
+                  100% { transform: scale(1); }
+                }
+                .animate-bounce-in {
+                  animation: bounceIn 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) both;
+                }
+              `}</style>
                   <Music className="animate-pulse" size={20}/> กดเพื่อเล่นเพลง
               </button>
           </div>
@@ -605,10 +626,12 @@ useEffect(() => {
       {!hasInteracted && (
         <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center backdrop-blur-sm animate-pop-in px-4">
             <div className="bg-slate-800 p-8 rounded-3xl border-4 border-yellow-400 text-center shadow-2xl max-w-sm md:max-w-lg w-full">
-                <h1 className="text-3xl md:text-4xl font-black text-white mb-6">พร้อมผจญภัยหรือยัง?</h1>
+            <h1 className="text-3xl md:text-4xl font-black text-white mb-6">
+    {savedData ? "กลับมาผจญภัยต่อ!" : "พร้อมผจญภัยหรือยัง?"}
+</h1>
                 <p className="text-slate-300 mb-8 text-lg">ภารกิจ: บริหารพลังงานให้ครบ 10 ข้อ!</p>
                 <button onClick={handleStartGame} className="bg-green-600 hover:bg-green-500 text-white text-xl md:text-2xl font-bold px-8 py-4 md:px-12 md:py-6 rounded-full shadow-lg flex items-center gap-3 mx-auto animate-bounce hover:scale-110 transition">
-                    <PlayCircle size={32} /> เริ่มเกมเลย!
+                <PlayCircle size={32} /> {savedData ? "เล่นต่อเลย!" : "เริ่มเกมเลย!"}
                 </button>
             </div>
         </div>
@@ -670,16 +693,20 @@ useEffect(() => {
       </div>
 
       {gameState === 'QUIZ' && activeQuestion && (
-          <MathModal 
-            question={activeQuestion} 
-            onAnswer={handleAnswer} 
-            volume={sfxVolume} 
-            // [แก้ไข] ถ้าเป็นโหมด CLASSROOM ให้เป็น 0 (ใช้ไม่ได้) ถ้าไม่ใช่ให้ใช้ค่าคงเหลือ
-            calculatorUsesLeft={mode === 'CLASSROOM' ? 0 : calcLeft}
-            // [แก้ไข] เมื่อกดใช้ ให้ลดจำนวนลง 1
-            onConsumeCalculator={() => setCalcLeft(prev => prev - 1)}
-            compact={true} 
-          />
+          // [เพิ่ม] div ครอบ MathModal เพื่อใส่ Transition ให้โผล่มาแบบลื่นไหล
+          <div 
+            className="fixed inset-0 z-[9999] animate-pop-in" 
+            style={{ animationDuration: '1s' }} 
+          >
+              <MathModal 
+                question={activeQuestion} 
+                onAnswer={handleAnswer} 
+                volume={sfxVolume} 
+                calculatorUsesLeft={mode === 'CLASSROOM' ? 0 : calcLeft}
+                onConsumeCalculator={() => setCalcLeft(prev => prev - 1)}
+                compact={true} 
+              />
+          </div>
       )}
 
       {gameState === 'FINISHED' && (
