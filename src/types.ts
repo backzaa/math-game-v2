@@ -1,34 +1,10 @@
-export type UserRole = 'STUDENT' | 'TEACHER';
-export type CharacterBase = 'BOY' | 'GIRL';
-export type SkinColor = '#fca5a5' | '#fcd34d' | '#8d5524' | '#e0ac69'; 
-export type CharacterType = 'ASTRONAUT' | 'ALIEN' | 'SUPERHERO' | 'NINJA' | 'PRINCESS';
-export type TileType = 'START' | 'FINISH' | 'NORMAL' | 'QUESTION' | 'TREASURE' | 'TRAP';
-export type ScoringMode = 'CLASSROOM' | 'FREEPLAY'; 
-export type GameType = 'CLASSIC' | 'RALLY'; // [เพิ่ม] ประเภทเกม
+// src/types.ts
+
+// ประเภทผู้ใช้งาน
+export type UserRole = 'TEACHER' | 'STUDENT';
 export type Gender = 'MALE' | 'FEMALE';
-export type ThemeId = 'SPACE' | 'JUNGLE' | 'OCEAN' | 'VOLCANO' | 'CANDY' | 'PIRATE' | 'CITY' | 'DESERT' | 'CASTLE' | 'SKY' | 'WINTER' | 'FARM';
 
-export interface ThemeConfig {
-  id: string;
-  name: string;
-  bgClass: string; 
-  primaryColor: string;
-  secondaryColor: string;
-  decorations: string[];
-  bgmUrls: string[];
-  pathColor?: string;
-  tileColor?: string;
-  tileBorder?: string;
-  player1Char?: string;
-  player2Char?: string;
-  themeBackgrounds?: Record<string, string>;
-}
-
-export interface CharacterAppearance {
-  base: CharacterBase;
-  skinColor: SkinColor;
-}
-
+// ข้อมูลการเล่นแต่ละครั้ง (Session)
 export interface QuestionDetail {
     questionText: string;
     isCorrect: boolean;
@@ -36,88 +12,92 @@ export interface QuestionDetail {
 }
 
 export interface GameSession {
-  sessionId: string;
-  date: string;       
-  score: number;
-  mode: ScoringMode;
-  timestamp: string;
-  details: QuestionDetail[]; 
-  isManual?: boolean;
-  note?: string;
-  realScore?: number;
-  bonusScore?: number;
-  // [เพิ่ม] ข้อมูลสำหรับเกมแบบ Rally
-  gameType?: GameType;
-  totalDistance?: number;
-  
-  // [เพิ่มใหม่] เก็บเวลาที่ใช้เล่น (วินาที) ✅
-  duration?: number; 
-}
-
-export interface StudentProfile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  nickname: string;
-  gender: Gender;
-  classroom: string;
-  profileImage?: string;
-  appearance: CharacterAppearance;
-  sessions: GameSession[]; 
-}
-
-export interface PlayerState extends StudentProfile {
-  position: number;
-  score: number;
-  character: string; 
-  calculatorUsesLeft: number;
-  isFinished: boolean;
-}
-
-export interface MathQuestion {
-  id: string;
-  question: string;
-  answer: number;
-  options: number[];
-}
-
-export interface QuestionLog {
-  questionId: string;
-  questionText: string;
-  correctAnswer: number;
-  studentAnswer: number;
-  isCorrect: boolean;
-  timestamp: string;
-}
-
-export interface TileConfig {
-    x: number;
-    y: number;
-    type: TileType;
-}
-
-export interface DailyQuestionSet {
+    sessionId: string;
     date: string;
-    questions: MathQuestion[];
+    timestamp: string;
+    score: number;
+    realScore: number;
+    bonusScore: number;
+    mode: ScoringMode;
+    details?: QuestionDetail[]; // รายละเอียดแต่ละข้อ
+    gameType?: GameType;       // 'CLASSIC' หรือ 'RALLY'
+    totalDistance?: number;    // สำหรับ Rally
+    duration?: number;         // เวลาที่ใช้เล่น (วินาที)
+    guestName?: string | null; // ชื่อ Guest (ถ้ามี)
 }
 
-export interface GameGlobalConfig {
-    themeBackgrounds: Record<string, string>;
-    bgmPlaylist: string[];
-    menuPlaylist: string[];
+// ข้อมูลนักเรียน (เปลี่ยนชื่อให้สั้นลง แต่รองรับชื่อเดิมด้วย)
+export interface Student {
+    id: string;
+    firstName: string;
+    lastName: string;
+    nickname: string;
+    gender: Gender;
+    classroom: string;
+    profileImage?: string;
+    totalScore?: number; // คะแนนรวมสะสม
+    sessions?: GameSession[];
+    appearance?: {
+        base: string;
+        skinColor: string;
+    };
 }
-// [เพิ่มใหม่] โครงสร้างข้อมูลประวัติการแลกของรางวัล
+// Alias ให้ชื่อเก่า (StudentProfile) ใช้ได้เหมือนกัน (กัน Error ไฟล์อื่น)
+export type StudentProfile = Student; 
+
+// โจทย์เลข
+export interface MathQuestion {
+    id: string;
+    question: string;
+    answer: number;
+    options: number[];
+    type?: 'DAILY' | 'FREEPLAY';
+}
+
+// การตั้งค่าเกม
+export interface ThemeConfig {
+    id: string;
+    name: string;
+    bgClass: string;
+    primaryColor: string;
+    secondaryColor: string;
+    decorations: string[];
+    bgmUrls: string[];
+}
+
+export interface GameConfig {
+    themeBackgrounds?: Record<string, string>; // map themeId -> url
+    bgmPlaylist?: string[];
+    menuPlaylist?: string[];
+}
+// Alias ชื่อเก่า
+export type GameGlobalConfig = GameConfig;
+
+// สถานะผู้เล่นในบอร์ดเกม
+export interface PlayerState extends Student {
+    position: number;     // ช่องปัจจุบัน (0-based)
+    score: number;        // คะแนนในเกมนี้
+    character: string;    // ตัวละครที่เลือก
+    calculatorUsesLeft: number; // จำนวนครั้งที่ใช้เครื่องคิดเลขได้
+    isFinished: boolean;  // เข้าเส้นชัยหรือยัง
+}
+
+// โหมดการเล่น
+export type ScoringMode = 'CLASSROOM' | 'FREEPLAY';
+export type GameType = 'CLASSIC' | 'RALLY';
+
+// ประวัติการแลกรางวัล
 export interface RedemptionRecord {
-  timestamp: string;
-  studentId: string;
-  rewardName: string;
-  pointsSpent: number;
-  teacherName: string;
+    id?: string;        // Firebase ID
+    timestamp: string;
+    studentId: string;
+    rewardName: string;
+    pointsSpent: number;
+    teacherName: string;
 }
 
-// [เพิ่มใหม่] โครงสร้างข้อมูลยอดเงินคงเหลือ (เอาไว้โชว์หน้า UI)
 export interface StudentBalance {
-  totalScore: number;      // คะแนนสะสมตลอดชีพ (Income)
-  totalRedeemed: number;   // คะแนนที่แลกไปแล้ว (Expense)
-  currentBalance: number;  // คะแนนคงเหลือที่ใช้ได้ (Balance)
+    totalScore: number;
+    totalRedeemed: number;
+    currentBalance: number;
 }

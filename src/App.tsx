@@ -12,7 +12,7 @@ import {
   Music, SkipForward, Play, Pause, Settings, Map, Flag 
 } from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
-import { TravelTransition } from './components/TravelTransition';
+import { TravelTransition } from './components/TravelTransition';;
 
 const THEMES: ThemeConfig[] = [
   { id: 'jungle', name: 'ป่ามหาสนุก', bgClass: 'jungle', primaryColor: 'green', secondaryColor: 'orange', decorations: [], bgmUrls: [] },
@@ -170,7 +170,7 @@ export function App() {
     const student = StorageService.getStudent(currentStudentId);
     if (!student || !student.sessions) return false;
     const today = new Date().toISOString().split('T')[0];
-    return student.sessions.some(s => s.mode === 'CLASSROOM' && s.date === today);
+    return student.sessions.some((s: any) => s.mode === 'CLASSROOM' && s.date === today);
   };
 
   const handleLogin = (role: UserRole, id: string, guestNickname?: string, guestAvatar?: string) => {
@@ -676,22 +676,64 @@ export function App() {
   }
 
   return (
-    <div onClick={handleGlobalClick} className="h-full w-full bg-slate-900 overflow-hidden flex flex-col font-sans" style={{ fontFamily: "'Mali', cursive" }}>
-      
-      <audio ref={audioRef} onEnded={handleNextSong} crossOrigin="anonymous" className="hidden" />
-      
-      {audioError && hasInteracted && activePlaylist.length > 0 && (<div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce"><button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base"><Music className="animate-pulse" size={16}/> เล่นเพลง</button></div>)}
+    <>
+       
 
-      {/* ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม */}
-      {screen !== 'GAME' && (
-        <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
-            {activePlaylist.length > 0 && (<div className="relative"><button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} /></button>{showMusicMenu && (<div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]"><div className="flex gap-2 mb-2"><button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button><button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button></div><div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">{activePlaylist.map((_, idx) => (<button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>🎵 เพลงที่ {idx + 1}</button>))}</div></div>)}</div>)}
-            <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Settings size={20} /></button>
-            {showSettings && (<div className="bg-slate-900/90 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000]"><div className="mb-4 text-xs"><span>BGM</span><input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div><div className="text-xs"><span>SFX</span><input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" /></div></div>)}
-        </div>
-      )}
+      <div onClick={handleGlobalClick} className="h-full w-full bg-slate-900 overflow-hidden flex flex-col font-sans" style={{ fontFamily: "'Mali', cursive" }}>
+        
+        <audio ref={audioRef} onEnded={handleNextSong} crossOrigin="anonymous" className="hidden" />
+        
+        {audioError && hasInteracted && activePlaylist.length > 0 && (
+          <div className="absolute top-16 md:top-20 right-4 z-50 animate-bounce">
+            <button onClick={forcePlayAudio} className="bg-red-600 text-white px-3 py-1 md:px-4 md:py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-xs md:text-base">
+              <Music className="animate-pulse" size={16}/> เล่นเพลง
+            </button>
+          </div>
+        )}
 
-      {renderContent()}
-    </div>
+        {/* ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม */}
+        {screen !== 'GAME' && (
+          <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
+              {activePlaylist.length > 0 && (
+                <div className="relative">
+                  <button onClick={() => setShowMusicMenu(!showMusicMenu)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700">
+                    <Music size={20} className={isPlaying ? "animate-pulse text-green-400" : "text-slate-400"} />
+                  </button>
+                  {showMusicMenu && (
+                    <div className="absolute right-0 mt-2 bg-slate-900/95 p-3 md:p-4 rounded-xl border border-slate-600 shadow-2xl w-48 md:w-64 backdrop-blur-md z-[3000]">
+                      <div className="flex gap-2 mb-2">
+                        <button onClick={() => setIsPlaying(!isPlaying)} className="flex-1 bg-slate-700 py-2 rounded flex justify-center">{isPlaying ? <Pause size={16}/> : <Play size={16}/>}</button>
+                        <button onClick={handleNextSong} className="flex-1 bg-slate-700 py-2 rounded flex justify-center"><SkipForward size={16}/></button>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">
+                        {activePlaylist.map((_, idx) => (
+                          <button key={idx} onClick={() => handleSelectSong(idx)} className={`w-full text-left text-[10px] md:text-xs p-2 rounded truncate ${currentSongIndex === idx ? 'bg-green-600/30 text-green-400' : 'text-slate-400'}`}>
+                            🎵 เพลงที่ {idx + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button onClick={() => setShowSettings(!showSettings)} className="bg-slate-900/80 p-2 md:p-3 rounded-full text-white hover:bg-slate-800 shadow-lg border border-slate-700"><Settings size={20} /></button>
+              {showSettings && (
+                <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-600 shadow-2xl backdrop-blur-md text-white w-56 z-[3000]">
+                  <div className="mb-4 text-xs">
+                    <span>BGM</span>
+                    <input type="range" min="0" max="1" step="0.1" value={bgmVolume} onChange={(e) => setBgmVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" />
+                  </div>
+                  <div className="text-xs">
+                    <span>SFX</span>
+                    <input type="range" min="0" max="1" step="0.1" value={sfxVolume} onChange={(e) => setSfxVolume(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer" />
+                  </div>
+                </div>
+              )}
+          </div>
+        )}
+
+        {renderContent()}
+      </div>
+    </>
   );
-}
+} // ปีกกาปิดตัวสุดท้ายของฟังก์ชัน App
