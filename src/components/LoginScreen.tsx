@@ -249,7 +249,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                 ) : (
                 <form 
                     key="teacher-form"
-                    onSubmit={(e)=>{e.preventDefault(); const p = (e.target as any).pass.value; if(p==='admin') onLogin('TEACHER','admin'); else alert('รหัสผ่านไม่ถูกต้อง'); }} 
+                    onSubmit={(e)=>{e.preventDefault(); const p = (e.target as any).pass.value; if(p==='113513') onLogin('TEACHER','admin'); else alert('รหัสผ่านไม่ถูกต้อง'); }} 
                     className="space-y-4"
                     style={{ animation: 'slide-in-right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards' }}
                 >
@@ -271,7 +271,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                     }
                 `}
               >
-                  <div className="w-full md:w-[380px] bg-slate-800 border-4 border-amber-400 shadow-2xl flex flex-col items-center justify-center text-center rounded-[60px] h-full">
+                  <div className="w-full md:w-[380px] bg-gradient-to-b from-stone-600 to-stone-900 border-4 border-amber-400 shadow-2xl flex flex-col items-center justify-center text-center rounded-[40px] h-full">
                       <div className="p-8 flex flex-col items-center w-full">
                         <div className="relative mb-6 p-2">
                             <div className="absolute -inset-4 bg-amber-400/30 rounded-full blur-xl animate-pulse"></div>
@@ -294,8 +294,8 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                                 </div>
                             ) : (
                                 <>
-                                    <h2 className="text-2xl md:text-4xl font-bold mb-2 leading-tight drop-shadow-md">{displayData.student?.firstName}</h2>
-                                    <div className="bg-amber-400 text-amber-900 text-xs md:text-sm font-bold uppercase px-4 py-1.5 rounded-full inline-block shadow-md"><span>ห้อง {displayData.student?.classroom || '-'} | {displayData.student?.nickname}</span></div>
+                                    <h2 className="text-2xl md:text-2xl font-bold mb-2 leading-tight drop-shadow-md">{displayData.student?.firstName} {displayData.student?.lastName}</h2>
+                                    <div className="bg-amber-400 text-amber-900 text-xs md:text-sm font-bold uppercase px-4 py-1.5 rounded-full inline-block shadow-md"><span> {displayData.student?.nickname} | ห้อง {displayData.student?.classroom || '-'}  </span></div>
                                 </>
                             )}
                         </div>
@@ -305,7 +305,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                                 <div className="bg-slate-900/80 rounded-2xl p-3 md:p-4 border border-amber-500/30 shadow-inner group transition-transform hover:scale-105">
                                     <div className="flex items-center justify-center gap-1 mb-1 md:mb-2 text-amber-400">
                                         <Trophy size={20} className="animate-bounce" />
-                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-amber-200">เกียรติยศรวม</span>
+                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-amber-200">คะแนน<br/>สะสมรวม</span>
                                     </div>
                                     <div className="text-2xl md:text-4xl font-black text-white drop-shadow-lg tracking-tighter">
                                         {(displayData.score || 0).toLocaleString()}
@@ -317,7 +317,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
                                     <div className="absolute top-0 right-0 w-10 h-10 bg-green-400/20 rounded-full blur-xl animate-pulse"></div>
                                     <div className="flex items-center justify-center gap-1 mb-1 md:mb-2 text-green-400">
                                         <Coins size={20} className="animate-spin-slow" />
-                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-green-200">แลกของได้</span>
+                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-green-200">แลกรางวัลได้</span>
                                     </div>
                                     <div className="text-2xl md:text-4xl font-black text-green-300 drop-shadow-md tracking-tighter">
                                         {(displayData.balance || 0).toLocaleString()}

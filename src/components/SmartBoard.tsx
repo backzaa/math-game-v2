@@ -696,7 +696,7 @@ useEffect(() => {
           // [เพิ่ม] div ครอบ MathModal เพื่อใส่ Transition ให้โผล่มาแบบลื่นไหล
           <div 
             className="fixed inset-0 z-[9999] animate-pop-in" 
-            style={{ animationDuration: '1s' }} 
+            style={{ animationDuration: '0.5s' }} 
           >
               <MathModal 
                 question={activeQuestion} 
