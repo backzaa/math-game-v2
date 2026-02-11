@@ -192,6 +192,12 @@ useEffect(() => {
         });
     }
   }, [totalDistance, currentScore, currentQuestionIdx, gameState, visualEnergy, calcLeft]); // เพิ่ม dependency ให้ครบ
+  // [เพิ่ม] ทันทีที่จบเกม (SmartBoard) ให้ลบ Save ออกทันที!
+  useEffect(() => {
+    if (gameState === 'FINISHED') {
+        StorageService.clearGameState();
+    }
+}, [gameState]);
 
   useEffect(() => {
     if (audioRef.current && activePlaylist.length > 0) {
@@ -686,9 +692,15 @@ useEffect(() => {
                     <div className="text-6xl font-black text-green-400 drop-shadow-glow">{totalDistance} <span className="text-lg text-slate-500">ม.</span></div>
                 </div>
                 <div className="mb-6 text-yellow-400 font-bold text-xl">คะแนนรวม: {currentScore}</div>
-                <button onClick={() => onGameEnd(totalDistance, currentScore)} className="bg-blue-600 w-full py-4 rounded-xl text-xl font-bold text-white shadow-lg hover:scale-105 transition flex items-center justify-center gap-2">
-                    <Home size={24} /> บันทึกและกลับ
-                </button>
+                <button 
+    onClick={() => {
+        StorageService.clearGameState(); // [เพิ่ม] ลบเซฟทันที
+        onGameEnd(totalDistance, currentScore); // ส่งข้อมูลกลับ (SmartBoard ไม่ใช้ duration)
+    }} 
+    className="bg-blue-600 w-full py-4 rounded-xl text-xl font-bold text-white shadow-lg hover:scale-105 transition flex items-center justify-center gap-2"
+>
+    <Home size={24} /> บันทึกและกลับ
+</button>
              </div>
          </div>
       )}

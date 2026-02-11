@@ -320,6 +320,14 @@ useEffect(() => {
         });
     }
   }, [localPlayers, localCurrentIndex, currentQuestionIndex, tiles, gameFinished, gameMode, pendingSteps, clearedTiles, activeQuestion, activeOverlay, elapsedTime]); // เพิ่ม dependencies ให้ครบ
+  // 👇 วางตรงนี้เลยครับ 👇
+  useEffect(() => {
+    if (gameFinished) {
+        StorageService.clearGameState(); // ล้าง Auto-Save
+        localStorage.removeItem('math_game_session_players');
+        localStorage.removeItem('math_game_session_index');
+    }
+}, [gameFinished]);
 
   useEffect(() => { playersRef.current = localPlayers; }, [localPlayers]);
   // [แก้ไขจุดที่ 3] Logic ตอนโหลดเกมกลับมา (Resume) + เช็ค Cleared Tiles

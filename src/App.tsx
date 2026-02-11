@@ -552,7 +552,7 @@ export function App() {
 
     if (screen === 'GAME' && selectedTheme) {
       // ---------------------------------------------------------
-      // กรณี 1: SmartBoard (Rally) -> ไม่มีการจับเวลา (ส่ง 0)
+      // กรณี 1: SmartBoard (Rally)
       // ---------------------------------------------------------
       if (gameType === 'RALLY') {
         return (
@@ -562,7 +562,11 @@ export function App() {
               questions={activeGameQuestions}
               mode={gameMode} 
               onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])}
-              onGameEnd={(dist, score) => { // ไม่ต้องรับ duration
+              
+              // [แก้ไข] เพิ่มการลบเซฟ (Anti-Cheat)
+              onGameEnd={(dist, score) => { 
+                  StorageService.clearGameState(); // <--- 1. สั่งลบเซฟทันทีที่จบเกม
+
                   if (currentStudentId) {
                       StorageService.addSession(
                           currentStudentId, 
@@ -572,15 +576,14 @@ export function App() {
                               timestamp: new Date().toISOString(), 
                               score: score, 
                               realScore: score, 
-                              bonusScore: 0,
+                              bonusScore: 0, 
                               mode: gameMode, 
                               details: sessionDetails,
                               // @ts-ignore
                               gameType: 'RALLY', 
                               // @ts-ignore
                               totalDistance: dist,
-                              
-                              duration: 0 // [Fix] SmartBoard ให้เวลาเป็น 0 เสมอ
+                              duration: 0 
                           }, 
                           currentStudentId === '00' ? guestName : '' 
                       );
@@ -593,7 +596,7 @@ export function App() {
           );
       } 
       // ---------------------------------------------------------
-      // กรณี 2: GameBoard (Classic) -> มีการจับเวลา!
+      // กรณี 2: GameBoard (Classic)
       // ---------------------------------------------------------
       else {
           return (
@@ -606,36 +609,34 @@ export function App() {
                 onTurnComplete={(p) => setGamePlayers(p)} 
                 onQuestionAnswered={(detail) => setSessionDetails(prev => [...prev, detail])} 
                 
-                // [Fix] รับค่า duration ที่ส่งมาจาก GameBoard
-                // ในส่วน else (ที่เป็น GameBoard)
-onGameEnd={(dist, score, duration = 0) => { 
-  if (currentStudentId) {
-      StorageService.addSession(
-          currentStudentId, 
-          { 
-              sessionId: Date.now().toString(), 
-              date: new Date().toLocaleDateString('th-TH'), 
-              timestamp: new Date().toISOString(), 
-              score: score, 
-              realScore: score, 
-              bonusScore: 0, 
-              mode: gameMode, 
-              details: sessionDetails,
-              // @ts-ignore
-              gameType: 'CLASSIC',
-              
-              // [แก้ไข] ใช้ค่า dist ที่รับมาใส่เข้าไปเลย (Warning จะหายไป)
-              // @ts-ignore
-              totalDistance: dist, 
-              
-              duration: duration
-          }, 
-          currentStudentId === '00' ? guestName : '' 
-      );
-  }
-  setScreen('RETURNING'); 
-  setSelectedTheme(null); 
-}} 
+                // [แก้ไข] เพิ่มการลบเซฟ (Anti-Cheat)
+                onGameEnd={(dist, score, duration = 0) => { 
+                  StorageService.clearGameState(); // <--- 2. สั่งลบเซฟทันทีที่จบเกม
+
+                  if (currentStudentId) {
+                      StorageService.addSession(
+                          currentStudentId, 
+                          { 
+                              sessionId: Date.now().toString(), 
+                              date: new Date().toLocaleDateString('th-TH'), 
+                              timestamp: new Date().toISOString(), 
+                              score: score, 
+                              realScore: score, 
+                              bonusScore: 0, 
+                              mode: gameMode, 
+                              details: sessionDetails,
+                              // @ts-ignore
+                              gameType: 'CLASSIC',
+                              // @ts-ignore
+                              totalDistance: dist, 
+                              duration: duration 
+                          }, 
+                          currentStudentId === '00' ? guestName : '' 
+                      );
+                  }
+                  setScreen('RETURNING'); 
+                  setSelectedTheme(null); 
+              }} 
                 onExit={() => setScreen('RETURNING')} 
             />
           );
