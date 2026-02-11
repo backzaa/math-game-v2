@@ -814,17 +814,17 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500"></div>
                     <div className="flex justify-between items-start mb-2">
                         <div>
-                            <h2 className="text-lg font-bold text-slate-400">ยอดคงเหลือของ</h2>
+                            <h2 className="text-lg font-bold text-slate-400">คะแนนสะสม</h2>
                             <h1 className="text-xl font-black text-white truncate max-w-[150px]">{selectedStudent.firstName}</h1>
                         </div>
                         <div className="text-right">
-                            <div className="text-xs text-slate-500 uppercase">Total Score</div>
+                            <div className="text-xs text-slate-500 uppercase">คะแนนสะสมรวม</div>
                             <div className="text-lg font-bold text-slate-300">{currentBalance.totalScore.toLocaleString()}</div>
                         </div>
                     </div>
 
                     <div className="mt-4 text-right">
-                        <div className="text-xs text-yellow-500 font-bold uppercase tracking-widest mb-1">Available Balance</div>
+                        <div className="text-xs text-yellow-500 font-bold uppercase tracking-widest mb-1">คะแนนสะสมคงเหลือ</div>
                         <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-sm leading-none">
                             {currentBalance.currentBalance.toLocaleString()}
                         </div>
@@ -833,11 +833,11 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
 
                 {/* ฟอร์มแลกของ (Compact) */}
                 <div className="bg-slate-800 p-5 rounded-3xl border border-slate-600 shadow-xl flex flex-col justify-center">
-                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><Flag className="text-pink-500" size={20}/> ทำรายการแลกรางวัล</h3>
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><Flag className="text-pink-500" size={20}/> แลกรางวัล (** 100 แต้ม = 1 บาท)</h3>
                     <div className="space-y-3">
                         <input
                             type="text"
-                            placeholder="ชื่อของรางวัล..."
+                            placeholder="ระบุรายการที่ต้องการแลก..."
                             value={rewardForm.name}
                             onChange={e => setRewardForm({...rewardForm, name: e.target.value})}
                             className="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm focus:border-pink-500 outline-none transition-all"
@@ -845,7 +845,7 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
                         <div className="flex gap-3">
                             <input
                                 type="number"
-                                placeholder="ใช้กี่แต้ม?"
+                                placeholder="จำนวนแต้มที่แลก"
                                 value={rewardForm.points}
                                 onChange={e => setRewardForm({...rewardForm, points: e.target.value})}
                                 className="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-sm text-center font-bold focus:border-pink-500 outline-none transition-all"

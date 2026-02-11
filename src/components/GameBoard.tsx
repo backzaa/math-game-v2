@@ -437,24 +437,49 @@ useEffect(() => {
     }, 500); 
 };
   
-  const handleTileEvent = (type: TileType) => { 
+const handleTileEvent = (type: TileType) => { 
     if (type === 'QUESTION') {
-        // [แก้ไขใหม่] หยิบโจทย์จากสำรับทีละใบ ตามลำดับตัวเลข
-        // (ใช้ % เพื่อให้วนกลับมาข้อแรกได้ ถ้าเดินตกช่องคำถามเกินจำนวนโจทย์ที่มี)
-        const q = questions[currentQuestionIndex % questions.length];
+        // 1. เช็คก่อนว่าช่องนี้เคยตอบไปหรือยัง (กันเดินถอยหลังมาเจอช่องเดิม)
+        const currentPos = localPlayers[localCurrentIndex].position;
+        if (clearedTiles.includes(currentPos)) {
+            // ถ้าเคยตอบแล้ว ให้จบเทิร์นเลย ไม่ต้องถามซ้ำ
+            endTurn();
+            return;
+        }
+
+        // 2. เช็คว่าโจทย์หมดสต็อกหรือยัง (กันเหนียว กรณีเดินตกช่องคำถามเกิน 10 ครั้ง)
+        if (currentQuestionIndex >= questions.length) {
+            // กรณีโจทย์หมดเกลี้ยงแล้วจริงๆ (หายากมาก เพราะมี 10 ช่องเท่าจำนวนโจทย์)
+            // ให้ถือว่าเป็นช่องว่างธรรมดา หรือแจ้งเตือนเล็กน้อยแล้วจบเทิร์น
+            setActiveOverlay({ type: 'TREASURE', msg: 'เก่งมาก! ตอบครบทุกข้อแล้ว' });
+            setTimeout(() => {
+                setActiveOverlay(null);
+                endTurn();
+            }, 1500);
+            return;
+        }
+
+        // 3. หยิบโจทย์ใบถัดไปจากกอง (ตามลำดับ Index)
+        const q = questions[currentQuestionIndex];
         
+        // 4. แสดงโจทย์
         setActiveQuestion(q);
-          setCurrentQuestionIndex(prev => prev + 1);
+        
+        // ❌ สำคัญมาก: อย่าเพิ่งสั่ง +1 ตรงนี้! ให้ไปบวกตอนตอบเสร็จ (handleAnswer)
     } 
-      else if (type === 'TREASURE') { 
-          playSfx(SFX.TREASURE); 
-          const bonus = GAME_CONFIG.pointsPerTreasure; 
-          setActiveOverlay({ type: 'TREASURE', msg: `เจอสมบัติ! +${bonus} คะแนน` }); 
-          const newPlayers = [...playersRef.current]; 
-          newPlayers[localCurrentIndex].score += bonus; 
-          setLocalPlayers(newPlayers); 
-      } 
-      else if (type === 'TRAP') { const back = Math.floor(Math.random() * 3) + 1; setTrapBackSteps(back); setActiveOverlay({ type: 'TRAP', msg: `โดนกับดัก! ถอยหลัง ${back} ช่อง` }); } 
+    else if (type === 'TREASURE') { 
+        playSfx(SFX.TREASURE); 
+        const bonus = GAME_CONFIG.pointsPerTreasure; 
+        setActiveOverlay({ type: 'TREASURE', msg: `เจอสมบัติ! +${bonus} คะแนน` }); 
+        const newPlayers = [...playersRef.current]; 
+        newPlayers[localCurrentIndex].score += bonus; 
+        setLocalPlayers(newPlayers); 
+    } 
+    else if (type === 'TRAP') { 
+        const back = Math.floor(Math.random() * 3) + 1; 
+        setTrapBackSteps(back); 
+        setActiveOverlay({ type: 'TRAP', msg: `โดนกับดัก! ถอยหลัง ${back} ช่อง` }); 
+    } 
   };
   
   const resumeMove = () => { 
@@ -501,9 +526,13 @@ useEffect(() => {
   
   // [แก้ไข] ตอบปุ๊บ บันทึกว่าเคลียร์ แล้วเดินต่อเลย
   const handleAnswer = (correct: boolean, usedCalculator: boolean) => { 
-    // 1. บันทึกว่าช่องปัจจุบัน (currentPos) ถูกเคลียร์แล้ว
+    // 1. บันทึกว่าช่องนี้ (Position นี้) ถูกเคลียร์แล้ว จะได้ไม่ถามซ้ำ
     const currentPos = localPlayers[localCurrentIndex].position;
-    setClearedTiles(prev => [...prev, currentPos]);
+    
+    // เช็คกันเหนียว ไม่ให้ push ซ้ำ
+    if (!clearedTiles.includes(currentPos)) {
+        setClearedTiles(prev => [...prev, currentPos]);
+    }
 
     // 2. คำนวณคะแนน
     if (activeQuestion) { 
@@ -519,11 +548,12 @@ useEffect(() => {
             }
             setLocalPlayers(newPlayers); 
         } 
-        // เปลี่ยนข้อรอไว้เลย
+        
+        // 3. ✅ ขยับไปโจทย์ข้อถัดไป (เตรียมไว้สำหรับช่องคำถามหน้า)
         setCurrentQuestionIndex(prev => prev + 1);
     } 
     
-    // 3. ปิดโจทย์ และ เดินต่อทันที!
+    // 4. ปิดหน้าต่างโจทย์ และเดินต่อ
     setActiveQuestion(null);
     resumeMove(); 
 };
