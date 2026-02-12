@@ -87,7 +87,7 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
             setDisplayData({ type: 'GUEST', avatar });
             showTimer = setTimeout(() => setShowCard(true), 50);
 
-        } else if (studentId.length >= 1) {
+        } else if (studentId.length >= 2) {
             const student = StorageService.getStudent(studentId);
             if (student) {
                 // [แก้ไข] ใช้ฟังก์ชันดึงยอดเงิน (Balance) ที่เราเพิ่งทำใน storage.ts

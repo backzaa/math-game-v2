@@ -1,319 +1,423 @@
-// src/services/storage.ts
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  increment, 
-  query, 
-  where,
-  orderBy, 
-  limit 
-} from 'firebase/firestore';
-import { db } from '../firebaseConfig';
-import type { Student, MathQuestion, GameConfig, GameSession, RedemptionRecord, Gender, StudentBalance } from '../types';
+import type { StudentProfile, GameSession, MathQuestion, Gender, GameGlobalConfig, RedemptionRecord, StudentBalance } from '../types';
 
-const KEYS = {
-  STUDENTS: 'math_game_students',
-  QUESTIONS_DAILY: 'math_game_questions_daily',
-  QUESTIONS_FREEPLAY: 'math_game_questions_freeplay',
-  CONFIG: 'math_game_config',
-  GAME_STATE: 'math_game_current_state',
-  LOCAL_LOGS: 'math_game_local_logs',
-  REDEMPTIONS: 'math_game_redemptions'
+const STORAGE_KEY = 'math_adventure_students';
+const DAILY_QUESTIONS_KEY = 'math_adventure_daily_questions';
+const FREEPLAY_QUESTIONS_KEY = 'math_adventure_freeplay_questions'; 
+const GAME_CONFIG_KEY = 'math_adventure_config';
+const REDEMPTIONS_KEY = 'math_adventure_redemptions'; // Key สำหรับเก็บประวัติแลกของ
+// URL ของ Google Apps Script ที่ Deploy ล่าสุด
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvDnSpbZX6DRcCM05HGYt82-fUR0zSiaoWHsVOAeg7N91ccR9Uiws_ffWNCYD1N3an/exec";
+
+const formatImageLink = (url: string) => {
+    if (!url) return '';
+    let link = url.trim();
+    if (link.includes('drive.google.com')) {
+        const idMatch = link.match(/\/d\/([a-zA-Z0-9_-]+)/) || link.match(/id=([a-zA-Z0-9_-]+)/);
+        if (idMatch && idMatch[1]) return `https://docs.google.com/uc?export=view&id=${idMatch[1]}`;
+    }
+    if (link.includes('dropbox.com')) return link.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+    return link;
 };
 
 export const StorageService = {
+  getAllStudents: (): StudentProfile[] => { 
+      try { 
+          const data = localStorage.getItem(STORAGE_KEY); 
+          const students = data ? JSON.parse(data) : [];
+          return students.map((s: StudentProfile) => ({
+              ...s,
+              profileImage: formatImageLink(s.profileImage || '')
+          }));
+      } catch (e) { return []; }
+  },
 
-  // ==========================================
-  // 1. ระบบ Sync (หัวใจหลัก)
-  // ==========================================
-  async syncFromCloud(): Promise<boolean> {
-    try {
-      console.log('🔄 กำลังดึงข้อมูลจาก Firebase...');
+  getStudent: (id: string): StudentProfile | null => {
+      const students = StorageService.getAllStudents();
+      return students.find(s => String(Number(s.id)) === String(Number(id))) || null;
+  },
+
+  registerStudent: async (id: string, fName: string, lName: string, nName: string, gender: Gender, classroom: string, img: string) => {
+      const students = StorageService.getAllStudents();
+      const newStudent: StudentProfile = { id, firstName: fName, lastName: lName, nickname: nName, gender, classroom, profileImage: formatImageLink(img), sessions: [], appearance: { base: gender === 'MALE' ? 'BOY' : 'GIRL', skinColor: '#fcd34d' } };
+      students.push(newStudent);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+      try { await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveStudent', ...newStudent }) }); } catch (e) {}
+  },
+
+  updateStudent: async (id: string, updates: Partial<StudentProfile>) => {
+      const students = StorageService.getAllStudents();
+      const idx = students.findIndex(s => String(Number(s.id)) === String(Number(id)));
+      if (idx !== -1) {
+          const formattedUpdates = { ...updates, profileImage: updates.profileImage ? formatImageLink(updates.profileImage) : students[idx].profileImage };
+          students[idx] = { ...students[idx], ...formattedUpdates };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+          try { await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveStudent', ...students[idx] }) }); } catch (e) {}
+      }
+  },
+
+  deleteStudent: async (id: string) => {
+      const students = StorageService.getAllStudents().filter(s => String(Number(s.id)) !== String(Number(id)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+      try { 
+          await fetch(SCRIPT_URL, { 
+              method: 'POST', 
+              mode: 'no-cors', 
+              body: JSON.stringify({ action: 'deleteStudent', id: id }) 
+          });
+      } catch (e) { console.error("Error deleting from cloud:", e); }
+  },
+
+  saveGameConfig: async (config: GameGlobalConfig) => {
+      localStorage.setItem(GAME_CONFIG_KEY, JSON.stringify(config));
+      try { await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveSettings', payload: config }) }); } catch (e) {}
+  },
+
+  getGameConfig: () => { const data = localStorage.getItem(GAME_CONFIG_KEY); return data ? JSON.parse(data) : null; },
+
+  deleteSession: async (sid: string, sessId: string) => {
+      const all = StorageService.getAllStudents();
+      const idx = all.findIndex(s => String(Number(s.id)) === String(Number(sid)));
       
-      // 1.1 ดึง Session ทั้งหมดก่อน
-      const sessionsSnap = await getDocs(collection(db, 'game_sessions'));
-      const allSessions = sessionsSnap.docs.map(doc => doc.data() as GameSession);
+      if (idx !== -1) { 
+          all[idx].sessions = all[idx].sessions.filter(s => s.sessionId !== sessId);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); 
+          try { 
+              await fetch(SCRIPT_URL, { 
+                  method: 'POST', 
+                  mode: 'no-cors', 
+                  body: JSON.stringify({ action: 'deleteScore', studentId: sid, sessionId: sessId }) 
+              });
+          } catch (e) { console.error("Error deleting score:", e); }
+      }
+  },
 
-      // 1.2 ดึงข้อมูลนักเรียน
-      const studentsSnap = await getDocs(collection(db, 'students'));
-      const students = studentsSnap.docs.map(doc => {
-        const s = { id: doc.id, ...doc.data() } as Student;
-        
-        // กรองเอาเฉพาะ Session ของนักเรียนคนนี้
-        s.sessions = allSessions.filter(sess => String(sess.sessionId) === String(s.id) || (sess as any).studentId === s.id);
-        
-        // คำนวณคะแนนรวมใหม่ (เพื่อให้หน้า Dashboard แสดงคะแนนถูกต้อง)
-        if (s.sessions && s.sessions.length > 0) {
-           s.sessions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-           s.totalScore = s.sessions.reduce((sum, sess) => sum + (sess.score || 0), 0);
-        } else {
-           s.totalScore = 0;
-        }
+  // --- ระบบล็อคโหมดห้องเรียน (Locking) ---
+  markPlayedToday: (studentId: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem(`locked_classroom_${studentId}_${today}`, 'true');
+  },
 
-        return s;
-      }) as Student[];
-      
-      localStorage.setItem(KEYS.STUDENTS, JSON.stringify(students));
+  checkLocalPlayedToday: (studentId: string): boolean => {
+    const today = new Date().toISOString().split('T')[0];
+    return localStorage.getItem(`locked_classroom_${studentId}_${today}`) === 'true';
+  },
 
-      // 1.3 ดึงข้อมูลโจทย์
-      const questionsSnap = await getDocs(collection(db, 'questions'));
-      const allQuestions = questionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      localStorage.setItem(KEYS.QUESTIONS_DAILY, JSON.stringify(allQuestions.filter(q => q.type === 'DAILY')));
-      localStorage.setItem(KEYS.QUESTIONS_FREEPLAY, JSON.stringify(allQuestions.filter(q => q.type === 'FREEPLAY')));
+  // --- ระบบแลกของรางวัล (Redemption System) ---
+  
+  // 1. ดึงประวัติการแลกทั้งหมดจาก Local
+  getAllRedemptions: (): RedemptionRecord[] => {
+      try {
+          const data = localStorage.getItem(REDEMPTIONS_KEY);
+          return data ? JSON.parse(data) : [];
+      } catch (e) { return []; }
+  },
 
-      // 1.4 ดึงการตั้งค่า
-      const configSnap = await getDoc(doc(db, 'settings', 'global_config'));
-      if (configSnap.exists()) {
-        localStorage.setItem(KEYS.CONFIG, JSON.stringify(configSnap.data()));
+  // 2. คำนวณยอดเงินคงเหลือ (รายรับ - รายจ่าย)
+  getStudentBalance: (studentId: string): StudentBalance => {
+      const students = StorageService.getAllStudents();
+      const student = students.find(s => String(s.id) === String(studentId)); // ใช้ String comparison เพื่อความชัวร์
+      const redemptions = StorageService.getAllRedemptions();
+
+      // คำนวณรายรับ (Total Score)
+      let totalScore = 0;
+      if (student && student.sessions) {
+          totalScore = student.sessions.reduce((sum, sess) => sum + (sess.score || 0), 0);
       }
 
-      // 1.5 ดึงประวัติการแลกรางวัล
-      const redemptionSnap = await getDocs(query(collection(db, 'redemptions'), orderBy('timestamp', 'desc')));
-      const redemptions = redemptionSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      localStorage.setItem(KEYS.REDEMPTIONS, JSON.stringify(redemptions));
-
-      console.log('✅ Sync ข้อมูลสำเร็จ (รวมคะแนนแล้ว)!');
-      return true;
-    } catch (error) {
-      console.error('❌ Sync ล้มเหลว:', error);
-      return false;
-    }
-  },
-
-  // ==========================================
-  // 2. Compatibility Layer (รองรับโค้ดเก่า)
-  // ==========================================
-  
-  getAllStudents(): Student[] {
-    return this.getStudents();
-  },
-
-  async registerStudent(id: string, fName: string, lName: string, nName: string, gender: Gender, classroom: string, img: string) {
-    const newStudent: Student = { 
-        id, 
-        firstName: fName, 
-        lastName: lName, 
-        nickname: nName, 
-        gender, 
-        classroom, 
-        profileImage: img, 
-        totalScore: 0,
-        sessions: [], 
-        appearance: { base: gender === 'MALE' ? 'BOY' : 'GIRL', skinColor: '#fcd34d' } 
-    };
-    
-    await setDoc(doc(db, 'students', id), newStudent);
-    
-    const students = this.getStudents();
-    students.push(newStudent);
-    localStorage.setItem(KEYS.STUDENTS, JSON.stringify(students));
-  },
-
-  async updateStudent(id: string, updates: Partial<Student>) {
-    await updateDoc(doc(db, 'students', id), updates);
-    await this.syncFromCloud();
-  },
-
-  async deleteStudent(id: string) {
-    if(!confirm('ยืนยันลบนักเรียนคนนี้? ข้อมูลจะหายถาวร')) return;
-    await deleteDoc(doc(db, 'students', id));
-    
-    const students = this.getStudents().filter(s => s.id !== id);
-    localStorage.setItem(KEYS.STUDENTS, JSON.stringify(students));
-  },
-
-  async deleteSession(studentId: string, sessionId: string) {
-     const q = query(collection(db, 'game_sessions'), where('studentId', '==', studentId), where('sessionId', '==', sessionId));
-     const snap = await getDocs(q);
-     
-     snap.forEach(async (d) => {
-         await deleteDoc(d.ref);
-         const scoreToRemove = d.data().score || 0;
-         await updateDoc(doc(db, 'students', studentId), {
-             totalScore: increment(-scoreToRemove)
-         });
-     });
-
-     const students = this.getStudents();
-     const idx = students.findIndex(s => s.id === studentId);
-     if (idx !== -1 && students[idx].sessions) {
-         students[idx].sessions = students[idx].sessions!.filter(s => s.sessionId !== sessionId);
-         localStorage.setItem(KEYS.STUDENTS, JSON.stringify(students));
-     }
-  },
-
-  getAllRedemptions(): RedemptionRecord[] {
-      const data = localStorage.getItem(KEYS.REDEMPTIONS);
-      return data ? JSON.parse(data) : [];
-  },
-
-  getStudentBalance(studentId: string): StudentBalance {
-      const students = this.getStudents();
-      const student = students.find(s => String(s.id) === String(studentId));
-      const redemptions = this.getAllRedemptions();
-
-      const totalScore = student?.totalScore || 0;
-      
+      // คำนวณรายจ่าย (Total Redeemed) ของเด็กคนนี้
       const myRedemptions = redemptions.filter(r => String(r.studentId) === String(studentId));
       const totalRedeemed = myRedemptions.reduce((sum, r) => sum + (r.pointsSpent || 0), 0);
 
       return {
           totalScore: totalScore,
           totalRedeemed: totalRedeemed,
-          currentBalance: totalScore 
+          currentBalance: totalScore - totalRedeemed
       };
   },
-  
-  // ==========================================
-  // 3. Getters
-  // ==========================================
 
-  getStudents(): Student[] {
-    const data = localStorage.getItem(KEYS.STUDENTS);
-    return data ? JSON.parse(data) : [];
-  },
+  // 3. สั่งแลกของรางวัล
+  redeemReward: async (studentId: string, rewardName: string, points: number, teacherName: string) => {
+      // บันทึกลง Local Storage ทันที
+      const newRecord: RedemptionRecord = {
+          timestamp: new Date().toISOString(),
+          studentId: studentId,
+          rewardName: rewardName,
+          pointsSpent: points,
+          teacherName: teacherName
+      };
 
-  getStudent(id: string): Student | undefined {
-    const students = this.getStudents();
-    return students.find(s => s.id === id);
-  },
+      const allRedemptions = StorageService.getAllRedemptions();
+      allRedemptions.push(newRecord);
+      localStorage.setItem(REDEMPTIONS_KEY, JSON.stringify(allRedemptions));
 
-  getDailyQuestions(): MathQuestion[] {
-    const data = localStorage.getItem(KEYS.QUESTIONS_DAILY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  getFreeplayQuestions(): MathQuestion[] {
-    const data = localStorage.getItem(KEYS.QUESTIONS_FREEPLAY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  getGameConfig(): GameConfig | null {
-    const data = localStorage.getItem(KEYS.CONFIG);
-    return data ? JSON.parse(data) : null;
-  },
-  
-  async saveGameConfig(config: GameConfig) {
-      await setDoc(doc(db, 'settings', 'global_config'), config);
-      localStorage.setItem(KEYS.CONFIG, JSON.stringify(config));
-  },
-
-  // ==========================================
-  // 4. บันทึกผลการเล่น
-  // ==========================================
-  async addSession(studentId: string, session: GameSession, guestName?: string): Promise<void> {
-    try {
-      await addDoc(collection(db, 'game_sessions'), {
-        studentId,
-        guestName: guestName || null,
-        ...session,
-        timestamp: new Date().toISOString()
-      });
-
-      if (studentId !== '00') {
-        const studentRef = doc(db, 'students', studentId);
-        await updateDoc(studentRef, { totalScore: increment(session.score) });
-        
-        const localStudents = this.getStudents();
-        const target = localStudents.find(s => s.id === studentId);
-        if (target) {
-            target.totalScore = (target.totalScore || 0) + session.score;
-            if (!target.sessions) target.sessions = [];
-            target.sessions.push(session);
-            localStorage.setItem(KEYS.STUDENTS, JSON.stringify(localStudents));
-        }
-      }
-    } catch (error) {
-      console.error('❌ บันทึกคะแนนล้มเหลว:', error);
-    }
-  },
-
-  // ==========================================
-  // 5. แลกรางวัล
-  // ==========================================
-  async redeemReward(studentId: string, rewardName: string, pointsCost: number, teacherName: string): Promise<boolean> {
+      // ส่งไปบันทึก Cloud (Google Sheet: reward_history)
       try {
-          const studentRef = doc(db, 'students', studentId);
-          const studentSnap = await getDoc(studentRef);
-          if (!studentSnap.exists()) return false;
-          
-          const currentScore = studentSnap.data().totalScore || 0;
-          if (currentScore < pointsCost) {
-              alert('คะแนนไม่พอครับ!');
-              return false;
-          }
-
-          await updateDoc(studentRef, { totalScore: increment(-pointsCost) });
-
-          const newRedemption = {
-              studentId,
-              rewardName,
-              pointsSpent: pointsCost,
-              teacherName,
-              timestamp: new Date().toISOString()
-          };
-
-          await addDoc(collection(db, 'redemptions'), newRedemption);
-
-          const localStudents = this.getStudents();
-          const target = localStudents.find(s => s.id === studentId);
-          if (target) {
-              const oldScore = target.totalScore || 0;
-              target.totalScore = oldScore - pointsCost;
-              localStorage.setItem(KEYS.STUDENTS, JSON.stringify(localStudents));
-          }
-          
-          const currentRedemptions = this.getAllRedemptions();
-          currentRedemptions.unshift(newRedemption as any);
-          localStorage.setItem(KEYS.REDEMPTIONS, JSON.stringify(currentRedemptions));
-
+          await fetch(SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              body: JSON.stringify({
+                  action: 'redeemReward',
+                  studentId: studentId,
+                  rewardName: rewardName,
+                  pointsSpent: points,
+                  teacherName: teacherName
+              })
+          });
           return true;
-      } catch (error) {
-          console.error('แลกรางวัลล้มเหลว', error);
+      } catch (e) {
+          console.error("Redeem Error", e);
           return false;
       }
   },
 
-  async getRedemptionHistory(): Promise<RedemptionRecord[]> {
-      const q = query(collection(db, 'redemptions'), orderBy('timestamp', 'desc'), limit(50));
-      const snap = await getDocs(q);
-      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as RedemptionRecord));
+  // --- End Reward System ---
+
+  saveScore: async (
+    id: string, 
+    name: string, 
+    score: number, 
+    realScore: number, 
+    bonusScore: number, 
+    mode: string, 
+    details: any[],
+    gameType: string = 'CLASSIC',
+    totalDistance: number = 0,
+    duration: number = 0 // [แก้ไข 1] รับค่าเวลาเพิ่มตรงนี้
+  ) => {
+      // [Lock Logic] ถ้าเป็นโหมดห้องเรียน ให้ฝัง Lock ลงเครื่องทันที
+      if (mode === 'CLASSROOM' && id !== '00') {
+          StorageService.markPlayedToday(id);
+      }
+
+      // --- กรณี Guest (ID 00) ---
+      if (id === '00') {
+          try { 
+              await fetch(SCRIPT_URL, { 
+                  method: 'POST', mode: 'no-cors', 
+                  body: JSON.stringify({ 
+                      action: 'saveScore', 
+                      id: '00', 
+                      name: name || 'ผู้มาเยือน', 
+                      score, 
+                      realScore, 
+                      bonusScore, 
+                      mode, 
+                      details,
+                      gameType,
+                      totalDistance,
+                      duration // [แก้ไข 2] ส่งเวลาของ Guest ไปด้วย
+                  }) 
+              }); 
+          } catch (e) {}
+          return; 
+      }
+
+      // --- กรณีนักเรียนปกติ ---
+      const students = StorageService.getAllStudents();
+      const idx = students.findIndex(s => String(Number(s.id)) === String(Number(id)));
+      
+      if (idx !== -1) {
+          const newSession: GameSession = {
+              sessionId: Date.now().toString(),
+              date: new Date().toLocaleDateString('th-TH'), // ใช้ toLocaleDateString ให้ตรงกับ Format ไทย
+              timestamp: new Date().toISOString(), // [แก้ไข] ใช้ ISO String เหมือนเดิม เพื่อแก้ Error types
+              score,
+              realScore,
+              bonusScore,
+              mode: mode as any,
+              details,
+              // @ts-ignore
+              gameType,
+              totalDistance,
+              duration // [แก้ไข 3] บันทึกเวลาลงในประวัติเครื่อง (เพื่อให้หน้าครูเห็น)
+          };
+
+          if (!students[idx].sessions) students[idx].sessions = [];
+          students[idx].sessions.push(newSession);
+          
+          // อัปเดตคะแนนรวม (ถ้ามี logic นี้อยู่แล้ว)
+          const currentTotal = (students[idx] as any).score || 0;
+          (students[idx] as any).score = currentTotal + realScore; 
+
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+
+          try { 
+              await fetch(SCRIPT_URL, { 
+                  method: 'POST', mode: 'no-cors', 
+                  body: JSON.stringify({ 
+                      action: 'saveScore', 
+                      id, 
+                      name: name || students[idx].firstName, 
+                      score, 
+                      realScore, 
+                      bonusScore, 
+                      mode, 
+                      details,
+                      gameType,
+                      totalDistance,
+                      duration // [แก้ไข 4] ส่งเวลาไปให้ Google Sheet
+                  }) 
+              }); 
+          } catch (e) {}
+      }
   },
 
-  // ==========================================
-  // 6. Anti-Cheat & Utils
-  // ==========================================
-  saveGameState(state: any) {
-    localStorage.setItem(KEYS.GAME_STATE, JSON.stringify(state));
+  addSession: async (id: string, sess: GameSession, studentName: string = '') => {
+    const realScore = sess.details ? sess.details.reduce((sum, d) => sum + (d.isCorrect ? d.scoreEarned : 0), 0) : 0;
+    // @ts-ignore
+    const isRally = sess.gameType === 'RALLY';
+    const bonusScore = isRally ? 0 : (sess.score - realScore);
+
+    // @ts-ignore
+    const gType = sess.gameType || 'CLASSIC';
+    // @ts-ignore
+    const tDist = sess.totalDistance || 0;
+    
+    // [แก้ไข] ดึงค่า duration จาก session มาเตรียมไว้ (ถ้าไม่มีให้เป็น 0)
+    const duration = sess.duration || 0; 
+
+    await StorageService.saveScore(
+        id, 
+        studentName, 
+        sess.score, 
+        realScore, 
+        bonusScore, 
+        sess.mode, 
+        sess.details || [],
+        gType,
+        tDist,
+        duration // [แก้ไขสำคัญ] ✅ ส่งค่าเวลาตัวนี้เพิ่มเข้าไปครับ!
+    );
+},
+
+syncFromCloud: async () => {
+    try {
+      const resp = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
+      const data = await resp.json();
+      
+      let students: StudentProfile[] = [];
+      if (data.students) {
+            students = data.students.map((s: any) => {
+                const studentScores = data.scores ? data.scores.filter((sc: any) => String(sc.studentId) === String(s.id)) : [];
+                const totalRealScore = studentScores.reduce((sum: number, sc: any) => sum + (Number(sc.realScore) || 0), 0);
+
+                return {
+                    ...s,
+                    score: totalRealScore, 
+                    profileImage: formatImageLink(s.profileImage || ''),
+                    sessions: studentScores.map((sc: any) => ({
+                        sessionId: sc.timestamp,
+                        date: new Date(sc.timestamp).toLocaleDateString('th-TH'),
+                        timestamp: sc.timestamp,
+                        realScore: Number(sc.realScore) || 0,
+                        bonusScore: Number(sc.bonusScore) || 0,
+                        score: Number(sc.totalScore) || 0,
+                        mode: sc.mode,
+                        details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
+                        gameType: sc.gameType || 'CLASSIC',
+                        totalDistance: Number(sc.totalDistance) || 0,
+                        duration: Number(sc.duration) || 0  // [จุดที่ 1] รับค่าเวลาของนักเรียน
+                    }))
+                };
+            });
+      }
+
+      const guestScores = data.scores ? data.scores.filter((sc: any) => String(sc.studentId) === '0' || String(sc.studentId) === '00') : [];
+      
+      if (guestScores.length > 0) {
+          const totalGuestScore = guestScores.reduce((sum: number, sc: any) => sum + (Number(sc.realScore) || 0), 0);
+          
+          const guestStudent: any = {
+              id: '00',
+              firstName: 'ผู้มาเยือน',
+              lastName: '',
+              nickname: 'Guest',
+              gender: 'MALE',
+              classroom: 'ทั่วไป',
+              profileImage: '', 
+              score: totalGuestScore,
+              appearance: { base: 'BOY', skinColor: '#fcd34d' },
+              sessions: guestScores.map((sc: any) => ({
+                  sessionId: sc.timestamp,
+                  date: new Date(sc.timestamp).toLocaleDateString('th-TH'),
+                  timestamp: sc.timestamp,
+                  playedBy: sc.studentName || sc.name || sc.Student_Name,
+                  realScore: Number(sc.realScore) || 0,
+                  bonusScore: Number(sc.bonusScore) || 0,
+                  score: Number(sc.totalScore) || 0,
+                  mode: sc.mode,
+                  details: typeof sc.details === 'string' ? JSON.parse(sc.details) : sc.details,
+                  gameType: sc.gameType || 'CLASSIC',
+                  totalDistance: Number(sc.totalDistance) || 0,
+                  duration: Number(sc.duration) || 0 // [จุดที่ 2] รับค่าเวลาของ Guest
+              }))
+          };
+          
+          const existingGuestIdx = students.findIndex(s => s.id === '00');
+          if (existingGuestIdx !== -1) {
+              students[existingGuestIdx] = guestStudent;
+          } else {
+              students.push(guestStudent);
+          }
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+        
+      if (data.settings) localStorage.setItem(GAME_CONFIG_KEY, JSON.stringify(data.settings));
+      if (data.dailyQs) localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(data.dailyQs));
+      if (data.freeplayQs) localStorage.setItem(FREEPLAY_QUESTIONS_KEY, JSON.stringify(data.freeplayQs));
+      
+      if (data.redemptions) {
+          localStorage.setItem(REDEMPTIONS_KEY, JSON.stringify(data.redemptions));
+      }
+
+      return true;
+
+    } catch (e) { return false; }
   },
 
-  loadGameState() {
-    const data = localStorage.getItem(KEYS.GAME_STATE);
-    return data ? JSON.parse(data) : null;
+  saveDailyQuestions: async (qs: MathQuestion[]) => {
+      localStorage.setItem(DAILY_QUESTIONS_KEY, JSON.stringify(qs));
+      try { await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveQuestions', mode: 'CLASSROOM', payload: qs }) }); } catch (e) {}
   },
 
-  clearGameState() {
-    localStorage.removeItem(KEYS.GAME_STATE);
+  getDailyQuestions: () => { const d = localStorage.getItem(DAILY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; },
+
+  saveFreeplayQuestions: async (qs: MathQuestion[]) => {
+      localStorage.setItem(FREEPLAY_QUESTIONS_KEY, JSON.stringify(qs));
+      try { await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveQuestions', mode: 'FREEPLAY', payload: qs }) }); } catch (e) {}
   },
 
-  checkLocalPlayedToday(studentId: string): boolean {
-    const logs = JSON.parse(localStorage.getItem(KEYS.LOCAL_LOGS) || '{}');
-    const lastPlayed = logs[studentId];
-    if (!lastPlayed) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return lastPlayed === today;
+  getFreeplayPool: () => { const d = localStorage.getItem(FREEPLAY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; },
+  
+  getFreeplayQuestions: () => { const d = localStorage.getItem(FREEPLAY_QUESTIONS_KEY); return d ? JSON.parse(d) : []; },
+
+  // --- Auto-Save System ---
+  saveGameState: (data: any) => {
+    const payload = {
+        date: new Date().toISOString().split('T')[0], 
+        data: data
+    };
+    localStorage.setItem('math_game_autosave', JSON.stringify(payload));
   },
 
-  markLocalPlayedToday(studentId: string) {
-    const logs = JSON.parse(localStorage.getItem(KEYS.LOCAL_LOGS) || '{}');
-    const today = new Date().toISOString().split('T')[0];
-    logs[studentId] = today;
-    localStorage.setItem(KEYS.LOCAL_LOGS, JSON.stringify(logs));
-  }
+  loadGameState: () => {
+    try {
+        const raw = localStorage.getItem('math_game_autosave');
+        if (!raw) return null;
+        
+        const parsed = JSON.parse(raw);
+        const today = new Date().toISOString().split('T')[0];
+
+        if (parsed.date !== today) {
+            localStorage.removeItem('math_game_autosave');
+            return null;
+        }
+        return parsed.data;
+    } catch (e) { return null; }
+  },
+
+  clearGameState: () => {
+      localStorage.removeItem('math_game_autosave');
+  } 
 };
