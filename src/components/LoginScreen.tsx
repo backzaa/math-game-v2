@@ -73,6 +73,13 @@ export const LoginScreen: React.FC<Props> = ({ onLogin }) => {
 
   // Effect จัดการข้อมูลนักเรียนและการ์ด (แก้ไขล่าสุด)
   useEffect(() => {
+    const syncData = async () => {
+        console.log("🔄 Auto-Syncing data from Google Sheets...");
+        await StorageService.syncFromCloud();
+    };
+    syncData();
+}, []);
+  useEffect(() => {
     let showTimer: any;
     let hideTimer: any;
 

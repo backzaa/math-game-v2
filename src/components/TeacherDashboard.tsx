@@ -106,7 +106,15 @@ export const TeacherDashboard: React.FC<Props> = ({ onLogout }) => {
       setGeneratedQuestions(Array.isArray(currentQs) ? currentQs : []);
   };
 
-  useEffect(() => { loadDataFromLocal(); }, [activeTab, questionSettingMode]);
+  // [แก้ไข] ดึงข้อมูลใหม่จาก Google Sheets ทุกครั้งที่หน้านี้โหลด หรือเปลี่ยนแท็บ
+  useEffect(() => {
+    const fetchData = async () => {
+        loadDataFromLocal(); // 1. โหลดข้อมูลเดิมในเครื่องมาโชว์ก่อน (จะได้ไม่โล่ง)
+        await StorageService.syncFromCloud(); // 2. แอบไปดึงข้อมูลล่าสุดจาก Google Sheets
+        loadDataFromLocal(); // 3. พอเสร็จแล้ว โหลดข้อมูลใหม่มาแสดงผลทันที
+    };
+    fetchData();
+}, [activeTab, questionSettingMode]);
   // [แทรกตรงนี้] เพิ่ม Effect เพื่ออัปเดตยอดเงินเมื่อเลือกนักเรียน
   useEffect(() => {
     if (selectedStudent) {
