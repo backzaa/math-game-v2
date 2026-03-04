@@ -701,8 +701,8 @@ export function App() {
           </div>
         )}
 
-        {/* ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม */}
-        {screen !== 'GAME' && (
+        {/* ซ่อนเมนู Controls ถ้าอยู่ในหน้าเล่นเกม หรือ หน้าโหมดกระดานจริง */}
+{screen !== 'GAME' && screen !== 'PHYSICAL_BOARD' && (
           <div className="absolute top-2 md:top-4 right-2 md:right-4 z-50 flex flex-col items-end gap-2">
               {activePlaylist.length > 0 && (
                 <div className="relative">
