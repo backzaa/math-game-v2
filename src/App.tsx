@@ -12,7 +12,8 @@ import {
   Music, SkipForward, Play, Pause, Settings, Map, Flag 
 } from 'lucide-react';
 import { PageTransition } from './components/PageTransition';
-import { TravelTransition } from './components/TravelTransition';;
+import { TravelTransition } from './components/TravelTransition';
+import { PhysicalBoardGame } from './components/PhysicalBoardGame';;
 
 const THEMES: ThemeConfig[] = [
   { id: 'jungle', name: 'ป่ามหาสนุก', bgClass: 'jungle', primaryColor: 'green', secondaryColor: 'orange', decorations: [], bgmUrls: [] },
@@ -54,7 +55,8 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 export function App() {
-  const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'GAME_TYPE_SELECT' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'RETURNING' | 'GAME' | 'DASHBOARD'>('LOADING');
+  
+  const [screen, setScreen] = useState<'LOADING' | 'LOGIN' | 'GAME_TYPE_SELECT' | 'MODE_SELECT' | 'THEME_SELECT' | 'TRAVELING' | 'RETURNING' | 'GAME' | 'DASHBOARD' | 'PHYSICAL_BOARD'>('LOADING');
   
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [guestName, setGuestName] = useState<string>('');
@@ -145,8 +147,13 @@ export function App() {
         isDataLoaded.current = true;
 
         setTimeout(() => {
-            setScreen('LOGIN');
-        }, 800);
+          // [แก้ไข] ให้เช็ค URL ตรงนี้ เพื่อให้มั่นใจว่าโหลดข้อมูลเสร็จแล้ว ค่อยเปลี่ยนหน้า
+          if (window.location.search.includes('mode=boardgame')) {
+              setScreen('PHYSICAL_BOARD');
+          } else {
+              setScreen('LOGIN');
+          }
+      }, 800);
 
       } catch (error) { 
           console.error("Load failed", error);
@@ -548,6 +555,9 @@ export function App() {
 
     if (screen === 'DASHBOARD') {
       return <TeacherDashboard onLogout={() => setScreen('LOGIN')} />;
+    }
+    if (screen === 'PHYSICAL_BOARD') {
+      return <PhysicalBoardGame />;
     }
 
     if (screen === 'GAME' && selectedTheme) {
